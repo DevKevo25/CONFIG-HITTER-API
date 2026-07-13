@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ DECRYPTOR · v2.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* ─── Reset & Base ─── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a12;
+            color: #b0e0e0;
+            font-family: 'Fira Code', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 200, 0.03) 0%, transparent 60%),
+                radial-gradient(circle at 80% 50%, rgba(0, 200, 255, 0.03) 0%, transparent 60%);
+            background-attachment: fixed;
+        }
+        /* ─── Glow overlay ─── */
+        .glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 255, 200, 0.02) 0px,
+                rgba(0, 255, 200, 0.02) 2px,
+                transparent 2px,
+                transparent 8px
+            );
+            z-index: -1;
+        }
+
+        /* ─── Container ─── */
+        .container {
+            max-width: 960px;
+            width: 100%;
+            background: rgba(10, 10, 20, 0.7);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(0, 255, 200, 0.2);
+            border-radius: 24px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(0, 255, 200, 0.1);
+            transition: border-color 0.3s;
+        }
+        .container:hover {
+            border-color: rgba(0, 255, 200, 0.4);
+        }
+
+        /* ─── Header ─── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: -0.5px;
+        }
+        .logo svg {
+            width: 36px;
+            height: 36px;
+            fill: none;
+            stroke: #00ffcc;
+            stroke-width: 2;
+            filter: drop-shadow(0 0 10px rgba(0, 255, 200, 0.3));
+        }
+        .logo span {
+            background: linear-gradient(135deg, #00ffcc, #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .badge {
+            font-size: 0.7rem;
+            background: rgba(0, 255, 200, 0.1);
+            border: 1px solid rgba(0, 255, 200, 0.25);
+            border-radius: 40px;
+            padding: 0.3rem 1rem;
+            color: #88e0d0;
+            letter-spacing: 1px;
+        }
+
+        /* ─── Drop Zone ─── */
+        .drop-zone {
+            border: 2px dashed rgba(0, 255, 200, 0.3);
+            border-radius: 18px;
+            padding: 3.5rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 255, 200, 0.02);
+            position: relative;
+        }
+        .drop-zone:hover {
+            border-color: #00ffcc;
+            background: rgba(0, 255, 200, 0.05);
+            box-shadow: inset 0 0 40px rgba(0, 255, 200, 0.03);
+        }
+        .drop-zone.dragover {
+            border-color: #00ffcc;
+            background: rgba(0, 255, 200, 0.08);
+            box-shadow: 0 0 40px rgba(0, 255, 200, 0.1);
+        }
+        .drop-zone .icon {
+            font-size: 3.5rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.7;
+        }
+        .drop-zone .text {
+            font-size: 1.1rem;
+            color: #88b0b0;
+        }
+        .drop-zone .hint {
+            font-size: 0.75rem;
+            color: #557777;
+            margin-top: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+        .file-info {
+            display: none;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #00ddbb;
+            background: rgba(0, 255, 200, 0.05);
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            border: 1px solid rgba(0, 255, 200, 0.15);
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .file-info .name {
+            font-weight: 600;
+            word-break: break-all;
+        }
+        .file-info .size {
+            color: #669999;
+            font-size: 0.8rem;
+        }
+
+        /* ─── Buttons ─── */
+        .actions {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(0, 255, 200, 0.4);
+            color: #b0e0e0;
+            padding: 0.75rem 2rem;
+            border-radius: 40px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .btn:hover {
+            background: rgba(0, 255, 200, 0.08);
+            border-color: #00ffcc;
+            color: #00ffcc;
+            box-shadow: 0 0 30px rgba(0, 255, 200, 0.05);
+        }
+        .btn-primary {
+            background: rgba(0, 255, 200, 0.12);
+            border-color: #00ffcc;
+            color: #00ffcc;
+        }
+        .btn-primary:hover {
+            background: rgba(0, 255, 200, 0.2);
+            box-shadow: 0 0 40px rgba(0, 255, 200, 0.15);
+        }
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* ─── Spinner ─── */
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0, 255, 200, 0.15);
+            border-top: 2px solid #00ffcc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ─── Output ─── */
+        .output {
+            margin-top: 2.5rem;
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
+            padding-bottom: 0.5rem;
+        }
+        .output-header span {
+            color: #88b0b0;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+        .output-header .copy-btn {
+            background: transparent;
+            border: none;
+            color: #669999;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: color 0.2s;
+            padding: 0.2rem 0.6rem;
+        }
+        .output-header .copy-btn:hover {
+            color: #00ffcc;
+        }
+        .output-body {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 14px;
+            padding: 1.5rem;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 255, 200, 0.08);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-family: 'Fira Code', monospace;
+            color: #c0e8e0;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+            transition: border-color 0.3s;
+        }
+        .output-body::-webkit-scrollbar {
+            width: 6px;
+            background: transparent;
+        }
+        .output-body::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 200, 0.2);
+            border-radius: 10px;
+        }
+        .output-body .json-key { color: #ffb86b; }
+        .output-body .json-string { color: #a8e06a; }
+        .output-body .json-number { color: #6ac8ff; }
+        .output-body .json-boolean { color: #ff79c6; }
+        .output-body .json-null { color: #ff79c6; }
+
+        /* ─── Status messages ─── */
+        .status {
+            margin-top: 1rem;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            gap: 0.7rem;
+        }
+        .status.error {
+            display: flex;
+            background: rgba(255, 50, 50, 0.08);
+            border: 1px solid rgba(255, 50, 50, 0.2);
+            color: #ff7777;
+        }
+        .status.success {
+            display: flex;
+            background: rgba(0, 255, 200, 0.06);
+            border: 1px solid rgba(0, 255, 200, 0.15);
+            color: #66ddbb;
+        }
+        .status .icon {
+            font-size: 1.2rem;
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 640px) {
+            .container { padding: 1.5rem 1rem; }
+            .logo { font-size: 1.2rem; }
+            .drop-zone { padding: 2rem 1rem; }
+            .btn { padding: 0.6rem 1.2rem; font-size: 0.8rem; }
+            .output-body { max-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                </svg>
+                <span>DECRYPTOR</span>
+            </div>
+            <div class="badge">⧩ v2.0 · 5 FORMATS</div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="dropZone">
+            <div class="icon">📂</div>
+            <div class="text">Drop your config file here</div>
+            <div class="hint">or click to browse · .hc .ehi .npvt .ssc .dark</div>
+            <input type="file" id="fileInput" accept=".hc,.ehi,.npvt,.ssc,.dark">
+        </div>
+
+        <!-- File Info -->
+        <div class="file-info" id="fileInfo">
+            <span class="name" id="fileName">config.hc</span>
+            <span class="size" id="fileSize">2.4 KB</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-primary" id="decryptBtn">
+                <span>⟳</span> DECRYPT
+            </button>
+            <button class="btn" id="clearBtn">
+                <span>✕</span> CLEAR
+            </button>
+        </div>
+
+        <!-- Status -->
+        <div class="status" id="status"></div>
+
+        <!-- Spinner -->
+        <div class="spinner" id="spinner"></div>
+
+        <!-- Output -->
+        <div class="output" id="output">
+            <div class="output-header">
+                <span>⬢ DECRYPTED OUTPUT</span>
+                <button class="copy-btn" id="copyBtn" title="Copy to clipboard">📋</button>
+            </div>
+            <div class="output-body" id="outputBody"></div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ─── Elements ──────────────────────────────────────────────────
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const decryptBtn = document.getElementById('decryptBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const status = document.getElementById('status');
+            const spinner = document.getElementById('spinner');
+            const output = document.getElementById('output');
+            const outputBody = document.getElementById('outputBody');
+            const copyBtn = document.getElementById('copyBtn');
+
+            let selectedFile = null;
+
+            // ─── Utilities ────────────────────────────────────────────────
+            function formatSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            }
+
+            function setStatus(message, type) {
+                status.className = 'status';
+                status.textContent = '';
+                if (!message) {
+                    status.style.display = 'none';
+                    return;
+                }
+                status.style.display = 'flex';
+                status.classList.add(type);
+                status.innerHTML = `<span class="icon">${type === 'error' ? '⚠' : '✓'}</span> ${message}`;
+            }
+
+            function showSpinner(show) {
+                spinner.style.display = show ? 'block' : 'none';
+                decryptBtn.disabled = show;
+            }
+
+            function clearOutput() {
+                output.style.display = 'none';
+                outputBody.textContent = '';
+                setStatus('', '');
+            }
+
+            function displayOutput(text) {
+                outputBody.textContent = text;
+                output.style.display = 'flex';
+                // Optional: attempt to highlight JSON
+                try {
+                    const parsed = JSON.parse(text);
+                    const formatted = JSON.stringify(parsed, null, 2);
+                    outputBody.textContent = formatted;
+                    // Simple syntax highlight with regex (basic)
+                    const highlighted = formatted.replace(
+                        /("(?:[^"\\]|\\.)*")(?=\s*:)/g,
+                        '<span class="json-key">$1</span>'
+                    ).replace(
+                        /: ("(?:[^"\\]|\\.)*")/g,
+                        ': <span class="json-string">$1</span>'
+                    ).replace(
+                        /: (\d+\.?\d*)/g,
+                        ': <span class="json-number">$1</span>'
+                    ).replace(
+                        /: (true|false)/g,
+                        ': <span class="json-boolean">$1</span>'
+                    ).replace(
+                        /: (null)/g,
+                        ': <span class="json-null">$1</span>'
+                    );
+                    outputBody.innerHTML = highlighted;
+                } catch {
+                    // Not JSON – display as plain text
+                    outputBody.textContent = text;
+                }
+            }
+
+            // ─── File handling ────────────────────────────────────────────
+            function handleFile(file) {
+                if (!file) return;
+                selectedFile = file;
+                fileName.textContent = file.name;
+                fileSize.textContent = formatSize(file.size);
+                fileInfo.style.display = 'flex';
+                setStatus(`Ready: ${file.name}`, 'success');
+                clearOutput();
+            }
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+
+            // ─── Clear ────────────────────────────────────────────────────
+            clearBtn.addEventListener('click', () => {
+                selectedFile = null;
+                fileInput.value = '';
+                fileInfo.style.display = 'none';
+                clearOutput();
+                setStatus('', '');
+            });
+
+            // ─── Decrypt ──────────────────────────────────────────────────
+            decryptBtn.addEventListener('click', async () => {
+                if (!selectedFile) {
+                    setStatus('Please select a file first.', 'error');
+                    return;
+                }
+
+                showSpinner(true);
+                setStatus('Decrypting...', 'success');
+
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                try {
+                    const response = await fetch('/decrypt', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Server error');
+                    }
+
+                    if (result.status !== 'success') {
+                        throw new Error(result.error || 'Decryption failed');
+                    }
+
+                    setStatus(`✅ Decrypted ${result.filename} (${result.extension})`, 'success');
+                    displayOutput(result.decrypted);
+
+                } catch (err) {
+                    setStatus(`❌ ${err.message}`, 'error');
+                } finally {
+                    showSpinner(false);
+                }
+            });
+
+            // ─── Copy ─────────────────────────────────────────────────────
+            copyBtn.addEventListener('click', () => {
+                const text = outputBody.textContent;
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    const original = copyBtn.textContent;
+                    copyBtn.textContent = '✔';
+                    setTimeout(() => copyBtn.textContent = original, 1500);
+                }).catch(() => {
+                    // fallback
+                    const range = document.createRange();
+                    range.selectNode(outputBody);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    document.execCommand('copy');
+                    window.getSelection().removeAllRanges();
+                    const original = copyBtn.textContent;
+                    copyBtn.textContent = '✔';
+                    setTimeout(() => copyBtn.textContent = original, 1500);
+                });
+            });
+
+            // ─── Init ─────────────────────────────────────────────────────
+            // Try to load a file from URL param ?file=... (if needed)
+            // For now, just start clean.
+            clearOutput();
+        })();
+    </script>
+</body>
+</html>
