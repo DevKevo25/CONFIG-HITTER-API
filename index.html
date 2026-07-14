@@ -1143,9 +1143,8 @@ function showResponse(prefix, status, body, ms) {
       : 'decrypted' + meta.ext);
 
     _store[prefix] = {
-      content: typeof rawDecrypted === 'object'
-        ? JSON.stringify(rawDecrypted, null, 2)
-        : String(rawDecrypted),
+      decrypted: rawDecrypted,          // raw value (obj or str) for /rebuild
+      extension: ext,                   // e.g. ".hc", "dark_tunnel"
       filename: fname,
       mime: meta.mime,
       label: meta.label,
@@ -1168,7 +1167,10 @@ function copyResponse(preId) {
 function copyDecrypted(prefix) {
   const d = _store[prefix];
   if (!d) return;
-  navigator.clipboard.writeText(d.content).then(() => {
+  const text = typeof d.decrypted === 'object'
+    ? JSON.stringify(d.decrypted, null, 2)
+    : String(d.decrypted);
+  navigator.clipboard.writeText(text).then(() => {
     const btn = event.target;
     const orig = btn.textContent;
     btn.textContent = 'Copied!';
@@ -1176,17 +1178,49 @@ function copyDecrypted(prefix) {
   }).catch(() => {});
 }
 
-function triggerDownload(prefix) {
+async function triggerDownload(prefix) {
   const d = _store[prefix];
   if (!d) return;
-  const blob = new Blob([d.content], { type: d.mime });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = d.filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+
+  const btn = document.querySelector(`#${prefix}-dl .btn-download`);
+  const origLabel = btn ? btn.innerHTML : '';
+  if (btn) btn.innerHTML = '<span style="opacity:.6">Building…</span>';
+
+  try {
+    const res = await fetch('/rebuild', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        decrypted:  d.decrypted,
+        extension:  d.extension,
+        filename:   d.filename,
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      alert('Rebuild failed: ' + (err.error || res.statusText));
+      return;
+    }
+
+    const blob = await res.blob();
+    // Read filename from Content-Disposition if present
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename[^;=\n]*=["']?([^"'\n;]+)/);
+    const fname = match ? match[1] : d.filename;
+
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  } catch (e) {
+    alert('Download error: ' + e.message);
+  } finally {
+    if (btn) btn.innerHTML = origLabel;
+  }
 }
 
 /* ─── API status ─── */

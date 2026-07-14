@@ -1,9 +1,11 @@
 # app.py - Fixed using dark_cloud_decryptor for string
 
 import os
+import io
 import json
 import base64
 import logging
+import zipfile
 import requests
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -273,6 +275,120 @@ def decrypt_ehi_cloud():
         
     except Exception as e:
         logger.exception('Error in /decrypt/ehi-cloud')
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
+
+def _extract_json_from_decrypted(decrypted_str):
+    """Pull the JSON object/array out of a banner-wrapped decrypted string."""
+    if isinstance(decrypted_str, (dict, list)):
+        return decrypted_str  # already parsed
+    s = str(decrypted_str)
+    # Find the first { or [ and the matching last } or ]
+    start = -1
+    for ch, end_ch in [('{', '}'), ('[', ']')]:
+        idx = s.find(ch)
+        if idx != -1 and (start == -1 or idx < start):
+            start = idx
+            end = s.rfind(end_ch)
+    if start == -1:
+        return None
+    try:
+        return json.loads(s[start:end + 1])
+    except Exception:
+        return None
+
+
+def _build_hc_file(config_json):
+    """HTTP Custom — importable JSON. Strip the Protections wrapper, keep Config fields."""
+    if isinstance(config_json, dict):
+        # If it came from our decryptor it has {"Protections": ..., "Config": {...}}
+        inner = config_json.get('Config', config_json)
+        return json.dumps(inner, indent=4, ensure_ascii=False).encode('utf-8')
+    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
+
+
+def _build_ehi_file(config_json):
+    """HTTP Injector — .ehi is a ZIP archive containing the config JSON."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('config.json', json.dumps(config_json, indent=4, ensure_ascii=False))
+    buf.seek(0)
+    return buf.read()
+
+
+def _build_npvt_file(config_json):
+    """NPVT — plain JSON config."""
+    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
+
+
+def _build_ssc_file(config_json):
+    """SSH Custom — plain JSON config."""
+    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
+
+
+def _build_dark_file(config_json):
+    """Dark Tunnel / Dark Cloud — plain JSON config."""
+    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
+
+
+EXT_BUILDERS = {
+    '.hc':         (_build_hc_file,   'application/octet-stream', '.hc'),
+    '.ehi':        (_build_ehi_file,   'application/zip',          '.ehi'),
+    '.ehi_cloud':  (_build_ehi_file,   'application/zip',          '.ehi'),
+    'ehi_cloud':   (_build_ehi_file,   'application/zip',          '.ehi'),
+    '.npvt':       (_build_npvt_file,  'application/octet-stream', '.npvt'),
+    '.ssc':        (_build_ssc_file,   'application/octet-stream', '.ssc'),
+    '.dark':       (_build_dark_file,  'application/octet-stream', '.dark'),
+    '.darktunnel': (_build_dark_file,  'application/octet-stream', '.dark'),
+    '.darkcloud':  (_build_dark_file,  'application/octet-stream', '.dark'),
+    'dark_tunnel': (_build_dark_file,  'application/octet-stream', '.dark'),
+}
+
+
+@app.route('/rebuild', methods=['POST'])
+def rebuild_file():
+    """
+    Reconstruct a proper importable config file from decrypted data.
+    Body JSON: { "decrypted": <str|obj>, "extension": ".hc", "filename": "optional" }
+    Returns the binary file as a download.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'decrypted' not in data:
+            return jsonify({'error': 'Missing "decrypted" field'}), 400
+
+        decrypted = data['decrypted']
+        ext = data.get('extension', '').lower().strip()
+        filename_base = data.get('filename', 'config')
+        # Strip any existing extension from filename_base
+        if '.' in filename_base:
+            filename_base = filename_base.rsplit('.', 1)[0]
+
+        builder_info = EXT_BUILDERS.get(ext)
+        if not builder_info:
+            return jsonify({'error': f'No file builder for extension: {ext}'}), 400
+
+        builder_fn, mime_type, out_ext = builder_info
+
+        # Extract JSON from the decrypted string/object
+        config_json = _extract_json_from_decrypted(decrypted)
+        if config_json is None:
+            return jsonify({'error': 'Could not extract JSON config from decrypted data'}), 400
+
+        file_bytes = builder_fn(config_json)
+        out_filename = filename_base + out_ext
+
+        logger.info(f'Rebuilt {out_filename} ({len(file_bytes)} bytes) for ext={ext}')
+
+        return send_file(
+            io.BytesIO(file_bytes),
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=out_filename
+        )
+
+    except Exception as e:
+        logger.exception('Error in /rebuild')
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
 
