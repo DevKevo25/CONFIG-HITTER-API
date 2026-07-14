@@ -15,5 +15,5 @@ Unified REST API for decrypting HTTP Custom (.hc), EHI (.ehi), NPVT (.npvt), SSC
   "status": "success",
   "extension": ".hc",
   "filename": "config.hc",
-  "decrypted": "HABIBI HTTP CUSTOM SCRIPT\n==============================\n\n{ ... }"
+  "decrypted": "KEVO LOVES HTTP CUSTOM SCRIPT\n==============================\n\n{ ... }"
 }# CONFIG-HITTER-API

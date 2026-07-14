@@ -130,11 +130,11 @@ class DTDecryptor:
                 normalized = cls._normalize_for_json(outer)
                 
                 return (
-                    f"HABIBI DARK TUNNEL SCRIPT\n"
+                    f"KEVO LOVES DARK TUNNEL SCRIPT\n"
                     f"{'='*30}\n\n"
                     f"{json.dumps(normalized, indent=4, ensure_ascii=False)}\n\n"
                     f"{'='*30}\n"
-                    f"code : @HABIBI_1ST"
+                    f"code : @KEVO_LOVES"
                 )
             else:
                 # Binary path - decrypt directly
@@ -171,19 +171,19 @@ class DTDecryptor:
                     
                     normalized = cls._normalize_for_json(unpacked)
                     return (
-                        f"HABIBI DARK TUNNEL SCRIPT\n"
+                        f"KEVO LOVES DARK TUNNEL SCRIPT\n"
                         f"{'='*30}\n\n"
                         f"{json.dumps(normalized, indent=4, ensure_ascii=False)}\n\n"
                         f"{'='*30}\n"
-                        f"code : @HABIBI_1ST"
+                        f"code : @KEVO_LOVES"
                     )
                 else:
                     return (
-                        f"HABIBI DARK TUNNEL SCRIPT\n"
+                        f"KEVO LOVES DARK TUNNEL SCRIPT\n"
                         f"{'='*30}\n\n"
                         f"{json.dumps(unpacked, indent=4, ensure_ascii=False)}\n\n"
                         f"{'='*30}\n"
-                        f"code : @HABIBI_1ST"
+                        f"code : @KEVO_LOVES"
                     )
             
         except Exception as e:

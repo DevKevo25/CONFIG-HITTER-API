@@ -572,6 +572,37 @@
     .json-num    { color: #f6ad55; }
     .json-bool   { color: #a78bfa; }
     .json-null   { color: #fc8181; }
+
+    /* ─── Download bar ─── */
+    .download-bar {
+      display: none;
+      margin-top: 10px;
+      padding: 12px 16px;
+      background: rgba(104,211,145,0.07);
+      border: 1px solid rgba(104,211,145,0.25);
+      border-radius: 8px;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .download-bar.show { display: flex; }
+    .download-bar-label { font-size: 12px; color: var(--accent2); flex: 1; min-width: 160px; }
+    .download-bar-label strong { font-family: var(--mono); }
+    .btn-download {
+      background: rgba(104,211,145,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(104,211,145,0.3);
+      padding: 7px 16px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-download:hover { background: rgba(104,211,145,0.25); }
   </style>
 </head>
 <body>
@@ -767,9 +798,16 @@
               <span class="status-badge" id="decrypt-file-badge"></span>
               <span id="decrypt-file-time" style="color:var(--text3)"></span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="copyResponse('decrypt-file-pre')">Copy</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" onclick="copyResponse('decrypt-file-pre')">Copy JSON</button>
+            </div>
           </div>
           <pre class="response-pre" id="decrypt-file-pre"></pre>
+        </div>
+        <div class="download-bar" id="decrypt-file-dl">
+          <div class="download-bar-label">✅ Decrypted — ready to import as <strong id="decrypt-file-dl-name"></strong></div>
+          <button class="btn-download" onclick="triggerDownload('decrypt-file')">⬇ Download File</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyDecrypted('decrypt-file')">Copy Raw</button>
         </div>
       </div>
 
@@ -785,7 +823,7 @@
   "status":    "success",
   "extension": ".hc",
   "filename":  "config.hc",
-  "decrypted": "HABIBI HTTP CUSTOM SCRIPT\n..."
+  "decrypted": "KEVO LOVES HTTP CUSTOM SCRIPT\n..."
 }</pre>
         </div>
       </div>
@@ -845,9 +883,14 @@
               <span class="status-badge" id="b64-badge"></span>
               <span id="b64-time" style="color:var(--text3)"></span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="copyResponse('b64-pre')">Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('b64-pre')">Copy JSON</button>
           </div>
           <pre class="response-pre" id="b64-pre"></pre>
+        </div>
+        <div class="download-bar" id="b64-dl">
+          <div class="download-bar-label">✅ Decrypted — ready to import as <strong id="b64-dl-name"></strong></div>
+          <button class="btn-download" onclick="triggerDownload('b64')">⬇ Download File</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyDecrypted('b64')">Copy Raw</button>
         </div>
       </div>
 
@@ -916,9 +959,14 @@ print(r.json())</pre>
               <span class="status-badge" id="dt-badge"></span>
               <span id="dt-time" style="color:var(--text3)"></span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="copyResponse('dt-pre')">Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('dt-pre')">Copy JSON</button>
           </div>
           <pre class="response-pre" id="dt-pre"></pre>
+        </div>
+        <div class="download-bar" id="dt-dl">
+          <div class="download-bar-label">✅ Decrypted — ready to import as <strong id="dt-dl-name"></strong></div>
+          <button class="btn-download" onclick="triggerDownload('dt')">⬇ Download File</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyDecrypted('dt')">Copy Raw</button>
         </div>
       </div>
 
@@ -993,9 +1041,14 @@ print(r.json())</pre>
               <span class="status-badge" id="ehi-badge"></span>
               <span id="ehi-time" style="color:var(--text3)"></span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="copyResponse('ehi-pre')">Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('ehi-pre')">Copy JSON</button>
           </div>
           <pre class="response-pre" id="ehi-pre"></pre>
+        </div>
+        <div class="download-bar" id="ehi-dl">
+          <div class="download-bar-label">✅ Decrypted — ready to import as <strong id="ehi-dl-name"></strong></div>
+          <button class="btn-download" onclick="triggerDownload('ehi')">⬇ Download File</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyDecrypted('ehi')">Copy Raw</button>
         </div>
       </div>
 
@@ -1043,32 +1096,97 @@ function syntaxHL(json) {
     });
 }
 
+/* ─── Per-endpoint decrypted store ─── */
+const _store = {};
+
+/* Extension → MIME type + importable file extension */
+const EXT_META = {
+  '.hc':         { ext: '.hc',   mime: 'text/plain',       label: 'HTTP Custom (.hc)' },
+  '.ehi':        { ext: '.ehi',  mime: 'application/octet-stream', label: 'HTTP Injector (.ehi)' },
+  '.npvt':       { ext: '.npvt', mime: 'application/octet-stream', label: 'NPVT Config (.npvt)' },
+  '.ssc':        { ext: '.ssc',  mime: 'text/plain',       label: 'SSH Custom (.ssc)' },
+  '.dark':       { ext: '.dark', mime: 'text/plain',       label: 'Dark Tunnel (.dark)' },
+  '.darktunnel': { ext: '.dark', mime: 'text/plain',       label: 'Dark Tunnel (.dark)' },
+  '.darkcloud':  { ext: '.dark', mime: 'text/plain',       label: 'Dark Cloud (.dark)' },
+  'dark_tunnel': { ext: '.dark', mime: 'text/plain',       label: 'Dark Tunnel (.dark)' },
+  'ehi_cloud':   { ext: '.ehi',  mime: 'application/octet-stream', label: 'HTTP Injector (.ehi)' },
+};
+
 function showResponse(prefix, status, body, ms) {
-  const box    = $(prefix + '-response');
-  const badge  = $(prefix + '-badge');
-  const time   = $(prefix + '-time');
-  const pre    = $(prefix + '-pre');
+  const box   = $(prefix + '-response');
+  const badge = $(prefix + '-badge');
+  const time  = $(prefix + '-time');
+  const pre   = $(prefix + '-pre');
+  const dl    = $(prefix + '-dl');
   box.classList.add('show');
   const ok = status >= 200 && status < 300;
   badge.className = 'status-badge ' + (ok ? 'ok' : 'err');
   badge.textContent = status;
   time.textContent = ms ? fmtMs(ms) : '';
+
+  let parsed = null;
   try {
-    const parsed = JSON.stringify(JSON.parse(body), null, 2);
-    pre.innerHTML = syntaxHL(parsed);
+    parsed = JSON.parse(body);
+    pre.innerHTML = syntaxHL(JSON.stringify(parsed, null, 2));
   } catch {
     pre.textContent = body;
   }
-}
 
-function setLoading(prefix, on) {
-  const sp = $(prefix + '-spinner');
-  if (sp) sp.style.display = on ? 'block' : 'none';
-  const btn = document.querySelector(`#${prefix.replace('-','')}-btn`) || null;
+  /* Show download bar on success */
+  if (dl) dl.classList.remove('show');
+  if (ok && parsed && parsed.status === 'success') {
+    const rawDecrypted = parsed.decrypted;
+    const ext   = parsed.extension || parsed.type || '.txt';
+    const meta  = EXT_META[ext] || { ext: '.txt', mime: 'text/plain', label: 'Config file (.txt)' };
+    const fname = (parsed.filename
+      ? parsed.filename.replace(/\.[^.]+$/, '') + meta.ext
+      : 'decrypted' + meta.ext);
+
+    _store[prefix] = {
+      content: typeof rawDecrypted === 'object'
+        ? JSON.stringify(rawDecrypted, null, 2)
+        : String(rawDecrypted),
+      filename: fname,
+      mime: meta.mime,
+      label: meta.label,
+    };
+
+    if (dl) {
+      const nameEl = $(prefix + '-dl-name');
+      if (nameEl) nameEl.textContent = fname + '  (' + meta.label + ')';
+      dl.classList.add('show');
+    }
+  } else {
+    delete _store[prefix];
+  }
 }
 
 function copyResponse(preId) {
   navigator.clipboard.writeText($(preId).textContent).catch(() => {});
+}
+
+function copyDecrypted(prefix) {
+  const d = _store[prefix];
+  if (!d) return;
+  navigator.clipboard.writeText(d.content).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(() => {});
+}
+
+function triggerDownload(prefix) {
+  const d = _store[prefix];
+  if (!d) return;
+  const blob = new Blob([d.content], { type: d.mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = d.filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
 
 /* ─── API status ─── */
