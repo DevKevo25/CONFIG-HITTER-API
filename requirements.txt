@@ -6,3 +6,4 @@ flask-cors==4.0.0
 pycryptodome==3.19.0
 msgpack==1.0.5
 argon2-cffi==23.1.0
+requests==2.34.2

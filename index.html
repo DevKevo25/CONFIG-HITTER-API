@@ -1,735 +1,1265 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ DECRYPTOR · v2.1</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            background: #0a0a12;
-            color: #b0e0e0;
-            font-family: 'Fira Code', monospace;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem 1rem;
-            background-image: 
-                radial-gradient(circle at 20% 50%, rgba(0, 255, 200, 0.03) 0%, transparent 60%),
-                radial-gradient(circle at 80% 50%, rgba(0, 200, 255, 0.03) 0%, transparent 60%);
-            background-attachment: fixed;
-        }
-        .glow {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 255, 200, 0.02) 0px,
-                rgba(0, 255, 200, 0.02) 2px,
-                transparent 2px,
-                transparent 8px
-            );
-            z-index: -1;
-        }
-        .container {
-            max-width: 960px;
-            width: 100%;
-            background: rgba(10, 10, 20, 0.7);
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(0, 255, 200, 0.2);
-            border-radius: 24px;
-            padding: 2.5rem 2rem;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(0, 255, 200, 0.1);
-            transition: border-color 0.3s;
-        }
-        .container:hover {
-            border-color: rgba(0, 255, 200, 0.4);
-        }
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 2.5rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-weight: 600;
-            font-size: 1.6rem;
-            letter-spacing: -0.5px;
-        }
-        .logo svg {
-            width: 36px;
-            height: 36px;
-            fill: none;
-            stroke: #00ffcc;
-            stroke-width: 2;
-            filter: drop-shadow(0 0 10px rgba(0, 255, 200, 0.3));
-        }
-        .logo span {
-            background: linear-gradient(135deg, #00ffcc, #00ccff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .badge {
-            font-size: 0.7rem;
-            background: rgba(0, 255, 200, 0.1);
-            border: 1px solid rgba(0, 255, 200, 0.25);
-            border-radius: 40px;
-            padding: 0.3rem 1rem;
-            color: #88e0d0;
-            letter-spacing: 1px;
-        }
-        .tabs {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
-            padding-bottom: 0.5rem;
-        }
-        .tab {
-            background: transparent;
-            border: none;
-            color: #557777;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.85rem;
-            padding: 0.5rem 1.2rem;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.3s;
-            font-weight: 600;
-        }
-        .tab:hover {
-            color: #88b0b0;
-            background: rgba(0, 255, 200, 0.05);
-        }
-        .tab.active {
-            color: #00ffcc;
-            background: rgba(0, 255, 200, 0.08);
-            box-shadow: 0 0 20px rgba(0, 255, 200, 0.05);
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .drop-zone {
-            border: 2px dashed rgba(0, 255, 200, 0.3);
-            border-radius: 18px;
-            padding: 2.5rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(0, 255, 200, 0.02);
-        }
-        .drop-zone:hover {
-            border-color: #00ffcc;
-            background: rgba(0, 255, 200, 0.05);
-            box-shadow: inset 0 0 40px rgba(0, 255, 200, 0.03);
-        }
-        .drop-zone.dragover {
-            border-color: #00ffcc;
-            background: rgba(0, 255, 200, 0.08);
-            box-shadow: 0 0 40px rgba(0, 255, 200, 0.1);
-        }
-        .drop-zone .icon {
-            font-size: 3rem;
-            margin-bottom: 0.5rem;
-            opacity: 0.7;
-        }
-        .drop-zone .text {
-            font-size: 1rem;
-            color: #88b0b0;
-        }
-        .drop-zone .hint {
-            font-size: 0.75rem;
-            color: #557777;
-            margin-top: 0.5rem;
-            letter-spacing: 0.5px;
-        }
-        .drop-zone input[type="file"] {
-            display: none;
-        }
-        .textarea-zone {
-            border: 2px solid rgba(0, 255, 200, 0.2);
-            border-radius: 18px;
-            padding: 0.5rem;
-            background: rgba(0, 0, 0, 0.4);
-            transition: border-color 0.3s;
-        }
-        .textarea-zone:focus-within {
-            border-color: #00ffcc;
-            box-shadow: 0 0 30px rgba(0, 255, 200, 0.05);
-        }
-        .textarea-zone textarea {
-            width: 100%;
-            min-height: 120px;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: #b0e0e0;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8rem;
-            padding: 0.8rem;
-            resize: vertical;
-            line-height: 1.6;
-        }
-        .textarea-zone textarea::placeholder {
-            color: #446666;
-        }
-        .file-info {
-            display: none;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            color: #00ddbb;
-            background: rgba(0, 255, 200, 0.05);
-            border-radius: 10px;
-            padding: 0.6rem 1rem;
-            border: 1px solid rgba(0, 255, 200, 0.15);
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .file-info .name {
-            font-weight: 600;
-            word-break: break-all;
-        }
-        .file-info .size {
-            color: #669999;
-            font-size: 0.8rem;
-        }
-        .actions {
-            margin-top: 1.5rem;
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .btn {
-            background: transparent;
-            border: 1px solid rgba(0, 255, 200, 0.4);
-            color: #b0e0e0;
-            padding: 0.75rem 2rem;
-            border-radius: 40px;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-        .btn:hover {
-            background: rgba(0, 255, 200, 0.08);
-            border-color: #00ffcc;
-            color: #00ffcc;
-            box-shadow: 0 0 30px rgba(0, 255, 200, 0.05);
-        }
-        .btn-primary {
-            background: rgba(0, 255, 200, 0.12);
-            border-color: #00ffcc;
-            color: #00ffcc;
-        }
-        .btn-primary:hover {
-            background: rgba(0, 255, 200, 0.2);
-            box-shadow: 0 0 40px rgba(0, 255, 200, 0.15);
-        }
-        .btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-        .spinner {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(0, 255, 200, 0.15);
-            border-top: 2px solid #00ffcc;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .output {
-            margin-top: 2rem;
-            display: none;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .output-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
-            padding-bottom: 0.5rem;
-        }
-        .output-header span {
-            color: #88b0b0;
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-        }
-        .output-header .copy-btn {
-            background: transparent;
-            border: none;
-            color: #669999;
-            cursor: pointer;
-            font-size: 1.1rem;
-            transition: color 0.2s;
-            padding: 0.2rem 0.6rem;
-        }
-        .output-header .copy-btn:hover {
-            color: #00ffcc;
-        }
-        .output-body {
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 14px;
-            padding: 1.5rem;
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid rgba(0, 255, 200, 0.08);
-            font-size: 0.85rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-all;
-            font-family: 'Fira Code', monospace;
-            color: #c0e8e0;
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
-        }
-        .output-body::-webkit-scrollbar {
-            width: 6px;
-            background: transparent;
-        }
-        .output-body::-webkit-scrollbar-thumb {
-            background: rgba(0, 255, 200, 0.2);
-            border-radius: 10px;
-        }
-        .output-body .json-key { color: #ffb86b; }
-        .output-body .json-string { color: #a8e06a; }
-        .output-body .json-number { color: #6ac8ff; }
-        .output-body .json-boolean { color: #ff79c6; }
-        .output-body .json-null { color: #ff79c6; }
-        .status {
-            margin-top: 1rem;
-            padding: 0.6rem 1rem;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            display: none;
-            align-items: center;
-            gap: 0.7rem;
-        }
-        .status.error {
-            display: flex;
-            background: rgba(255, 50, 50, 0.08);
-            border: 1px solid rgba(255, 50, 50, 0.2);
-            color: #ff7777;
-        }
-        .status.success {
-            display: flex;
-            background: rgba(0, 255, 200, 0.06);
-            border: 1px solid rgba(0, 255, 200, 0.15);
-            color: #66ddbb;
-        }
-        .status .icon {
-            font-size: 1.2rem;
-        }
-        @media (max-width: 640px) {
-            .container { padding: 1.5rem 1rem; }
-            .logo { font-size: 1.2rem; }
-            .drop-zone { padding: 1.5rem 1rem; }
-            .btn { padding: 0.6rem 1.2rem; font-size: 0.8rem; }
-            .output-body { max-height: 300px; }
-            .tab { font-size: 0.75rem; padding: 0.4rem 0.8rem; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decryptor API · v2.1</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #080b12;
+      --bg2:       #0d1220;
+      --bg3:       #111827;
+      --border:    rgba(99,179,237,0.15);
+      --border-hi: rgba(99,179,237,0.4);
+      --accent:    #63b3ed;
+      --accent2:   #68d391;
+      --accent3:   #f6ad55;
+      --accent4:   #fc8181;
+      --text:      #e2e8f0;
+      --text2:     #94a3b8;
+      --text3:     #4a5568;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Inter', sans-serif;
+      --radius:    12px;
+      --radius-lg: 18px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ─── Layout ─── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+    }
+    .sidebar-logo .subtitle {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      margin-top: 2px;
+    }
+    .sidebar-logo .version {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 10px;
+      font-family: var(--mono);
+      background: rgba(99,179,237,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(99,179,237,0.2);
+      border-radius: 20px;
+      padding: 2px 8px;
+    }
+
+    .sidebar-section-label {
+      padding: 16px 24px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text3);
+    }
+    .sidebar-nav { padding: 0 12px 12px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13.5px;
+      color: var(--text2);
+      text-decoration: none;
+      margin-bottom: 2px;
+    }
+    .nav-item:hover { background: rgba(99,179,237,0.06); color: var(--text); }
+    .nav-item.active { background: rgba(99,179,237,0.12); color: var(--accent); }
+    .nav-item .method {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 5px;
+      min-width: 38px;
+      text-align: center;
+    }
+    .method.get  { background: rgba(104,211,145,0.15); color: var(--accent2); }
+    .method.post { background: rgba(99,179,237,0.15);  color: var(--accent); }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 24px;
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4a5568;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .status-dot.online { background: var(--accent2); box-shadow: 0 0 6px rgba(104,211,145,0.4); }
+    .status-dot.error  { background: var(--accent4); }
+
+    /* ─── Main ─── */
+    .main { flex: 1; min-width: 0; }
+
+    /* ─── Section ─── */
+    .section { padding: 40px 48px; border-bottom: 1px solid var(--border); }
+    .section:last-child { border-bottom: none; }
+
+    .section-header { margin-bottom: 28px; }
+    .section-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .section-header p {
+      color: var(--text2);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    /* ─── Endpoint Header ─── */
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .endpoint-method {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 8px;
+    }
+    .endpoint-method.get  { background: rgba(104,211,145,0.15); color: var(--accent2); border: 1px solid rgba(104,211,145,0.2); }
+    .endpoint-method.post { background: rgba(99,179,237,0.15);  color: var(--accent);  border: 1px solid rgba(99,179,237,0.2); }
+    .endpoint-path {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .endpoint-desc { color: var(--text2); font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+
+    /* ─── Cards ─── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text3);
+    }
+
+    /* ─── Params Table ─── */
+    .params-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .params-table th {
+      text-align: left;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text3);
+      background: var(--bg3);
+    }
+    .params-table td {
+      padding: 10px 18px;
+      border-bottom: 1px solid rgba(99,179,237,0.06);
+      vertical-align: top;
+    }
+    .params-table tr:last-child td { border-bottom: none; }
+    .param-name { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .param-type { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .param-required {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(246,173,85,0.12);
+      color: var(--accent3);
+      border: 1px solid rgba(246,173,85,0.2);
+    }
+    .param-optional {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(99,179,237,0.08);
+      color: var(--text3);
+    }
+    .param-desc { color: var(--text2); font-size: 13px; }
+
+    /* ─── Try It ─── */
+    .try-section { margin-top: 24px; }
+    .try-section h4 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text3);
+      margin-bottom: 14px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+    .form-input, .form-textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+    .form-textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+    .form-input::placeholder, .form-textarea::placeholder { color: var(--text3); }
+
+    /* ─── Drop Zone ─── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg3);
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(99,179,237,0.04);
+    }
+    .drop-zone .dz-icon { font-size: 2rem; margin-bottom: 8px; }
+    .drop-zone .dz-text { font-size: 13px; color: var(--text2); }
+    .drop-zone .dz-hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+    .drop-zone input[type="file"] { display: none; }
+    .file-selected {
+      display: none;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(104,211,145,0.08);
+      border: 1px solid rgba(104,211,145,0.2);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent2);
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── Buttons ─── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1220;
+    }
+    .btn-primary:hover { background: #90cdf4; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ─── Response Box ─── */
+    .response-box {
+      margin-top: 16px;
+      display: none;
+    }
+    .response-box.show { display: block; }
+    .response-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+    }
+    .response-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .status-badge {
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .status-badge.ok  { background: rgba(104,211,145,0.15); color: var(--accent2); }
+    .status-badge.err { background: rgba(252,129,129,0.15); color: var(--accent4); }
+    .response-pre {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 0 0 8px 8px;
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text2);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* ─── Code block ─── */
+    .code-block {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text2);
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 10px;
+    }
+
+    /* ─── Example block ─── */
+    .examples-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 900px) { .examples-grid { grid-template-columns: 1fr; } }
+    .example-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .example-card-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .example-card pre {
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text2);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+
+    /* ─── Alert ─── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .alert-info  { background: rgba(99,179,237,0.08); border: 1px solid rgba(99,179,237,0.2); color: var(--text2); }
+    .alert-warn  { background: rgba(246,173,85,0.08); border: 1px solid rgba(246,173,85,0.2); color: #fbd38d; }
+
+    /* ─── Extension Badge ─── */
+    .ext-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      margin: 2px;
+    }
+
+    /* ─── Divider ─── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* ─── Spinner ─── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(13,18,32,0.3);
+      border-top-color: #0d1220;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Hero ─── */
+    .hero {
+      background: linear-gradient(135deg, var(--bg2) 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 48px 40px;
+    }
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.6px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    .hero p { color: var(--text2); font-size: 15px; max-width: 600px; }
+    .hero-meta {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .hero-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .hero-meta-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
+
+    /* ─── Supported format grid ─── */
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .format-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      transition: border-color 0.2s;
+    }
+    .format-card:hover { border-color: var(--border-hi); }
+    .format-ext {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .format-name { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+    /* ─── Response tabs ─── */
+    .rtabs { display: flex; gap: 4px; margin-bottom: 10px; }
+    .rtab {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: var(--bg3);
+      color: var(--text3);
+      border: 1px solid var(--border);
+      transition: all 0.15s;
+    }
+    .rtab.active { background: rgba(99,179,237,0.12); color: var(--accent); border-color: rgba(99,179,237,0.3); }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .section { padding: 24px 20px; }
+      .hero { padding: 28px 20px; }
+    }
+    @media (max-width: 960px) {
+      .section { padding: 32px 28px; }
+      .hero { padding: 36px 28px; }
+    }
+
+    /* ─── JSON syntax coloring ─── */
+    .json-key    { color: #7ec8e3; }
+    .json-str    { color: #68d391; }
+    .json-num    { color: #f6ad55; }
+    .json-bool   { color: #a78bfa; }
+    .json-null   { color: #fc8181; }
+  </style>
 </head>
 <body>
-    <div class="glow"></div>
-    <div class="container">
-        <div class="header">
-            <div class="logo">
-                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                </svg>
-                <span>DECRYPTOR</span>
-            </div>
-            <div class="badge">⧩ v2.1 · 5 FORMATS + STRING</div>
-        </div>
+<div class="layout">
 
-        <div class="tabs">
-            <button class="tab active" data-tab="file">📄 File</button>
-            <button class="tab" data-tab="string">🔗 Dark String</button>
-            <button class="tab" data-tab="ehi">☁️ EHI Cloud</button>
-        </div>
-
-        <div class="tab-content active" id="tab-file">
-            <div class="drop-zone" id="dropZone">
-                <div class="icon">📂</div>
-                <div class="text">Drop your config file here</div>
-                <div class="hint">or click to browse · .hc .ehi .npvt .ssc .dark</div>
-                <input type="file" id="fileInput" accept=".hc,.ehi,.npvt,.ssc,.dark">
-            </div>
-            <div class="file-info" id="fileInfo">
-                <span class="name" id="fileName">config.hc</span>
-                <span class="size" id="fileSize">2.4 KB</span>
-            </div>
-        </div>
-
-        <div class="tab-content" id="tab-string">
-            <div class="textarea-zone">
-                <textarea id="stringInput" placeholder="Paste your dark tunnel string here... &#10;darktunnel://"></textarea>
-            </div>
-        </div>
-
-        <!-- Add EHI Cloud tab to index.html -->
-        <div class="tab-content" id="tab-ehi">
-            <div class="ehi-input-zone">
-                <div style="margin-bottom: 1rem; color: #88b0b0; font-size: 0.9rem;">
-                    Paste your EHI cloud link or key:
-                </div>
-                <div class="input-group" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <input type="text" id="ehiInput" placeholder="https://ehi.link/WPKKACR9 or WPKKACR9" 
-                        style="flex: 1; min-width: 200px; background: rgba(0,0,0,0.4); border: 2px solid rgba(0,255,200,0.2); 
-                                border-radius: 12px; padding: 0.8rem 1rem; color: #b0e0e0; font-family: 'Fira Code', monospace;
-                                font-size: 0.85rem; outline: none; transition: border-color 0.3s;">
-                    <button class="btn btn-primary" id="fetchEhiBtn" style="white-space: nowrap;">
-                        <span>⬇</span> FETCH
-                    </button>
-                </div>
-                <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #446666;">
-                    Supported: ehi.link links or direct keys
-                </div>
-            </div>
-        </div>
-
-        <div class="actions">
-            <button class="btn btn-primary" id="decryptBtn"><span>⟳</span> DECRYPT</button>
-            <button class="btn" id="clearBtn"><span>✕</span> CLEAR</button>
-        </div>
-
-        <div class="status" id="status"></div>
-        <div class="spinner" id="spinner"></div>
-
-        <div class="output" id="output">
-            <div class="output-header">
-                <span>⬢ DECRYPTED OUTPUT</span>
-                <button class="copy-btn" id="copyBtn" title="Copy to clipboard">📋</button>
-            </div>
-            <div class="output-body" id="outputBody"></div>
-        </div>
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="title">Decryptor API</div>
+      <div class="subtitle">REST · Config File Decryption</div>
+      <span class="version">v2.1.0</span>
     </div>
 
-    <script>
-        (function() {
-            // Elements
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('fileInput');
-            const fileInfo = document.getElementById('fileInfo');
-            const fileName = document.getElementById('fileName');
-            const fileSize = document.getElementById('fileSize');
-            const stringInput = document.getElementById('stringInput');
-            const decryptBtn = document.getElementById('decryptBtn');
-            const clearBtn = document.getElementById('clearBtn');
-            const status = document.getElementById('status');
-            const spinner = document.getElementById('spinner');
-            const output = document.getElementById('output');
-            const outputBody = document.getElementById('outputBody');
-            const copyBtn = document.getElementById('copyBtn');
-            const tabs = document.querySelectorAll('.tab');
-            const tabContents = {
-                file: document.getElementById('tab-file'),
-                string: document.getElementById('tab-string'),
-                ehi: document.getElementById('tab-ehi')
-            };
+    <div class="sidebar-section-label">Reference</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="#overview" onclick="setActive(this)">
+        <span>📋</span> Overview
+      </a>
+      <a class="nav-item" href="#formats" onclick="setActive(this)">
+        <span>📦</span> Formats
+      </a>
+    </nav>
 
-            let selectedFile = null;
-            let activeTab = 'file';
+    <div class="sidebar-section-label">Endpoints</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#health" onclick="setActive(this)">
+        <span class="method get">GET</span> /health
+      </a>
+      <a class="nav-item" href="#decrypt-file" onclick="setActive(this)">
+        <span class="method post">POST</span> /decrypt
+      </a>
+      <a class="nav-item" href="#decrypt-base64" onclick="setActive(this)">
+        <span class="method post">POST</span> /decrypt/base64
+      </a>
+      <a class="nav-item" href="#decrypt-darktunnel" onclick="setActive(this)">
+        <span class="method post">POST</span> /decrypt/darktunnel
+      </a>
+      <a class="nav-item" href="#decrypt-ehi-cloud" onclick="setActive(this)">
+        <span class="method post">POST</span> /decrypt/ehi-cloud
+      </a>
+    </nav>
 
-            // ─── Tab switching ────────────────────────────────────────────
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    const target = tab.dataset.tab;
-                    activeTab = target;
-                    Object.keys(tabContents).forEach(key => {
-                        tabContents[key].classList.toggle('active', key === target);
-                    });
-                    clearOutput();
-                    setStatus('', '');
-                });
-            });
+    <div class="status-indicator">
+      <div class="status-dot" id="sidebar-dot"></div>
+      <span id="sidebar-status">Checking API…</span>
+    </div>
+  </aside>
 
-            // ─── Utilities ────────────────────────────────────────────────
-            function formatSize(bytes) {
-                if (bytes < 1024) return bytes + ' B';
-                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-            }
+  <!-- ─── Main ─── -->
+  <main class="main">
 
-            function setStatus(message, type) {
-                status.className = 'status';
-                status.textContent = '';
-                if (!message) {
-                    status.style.display = 'none';
-                    return;
-                }
-                status.style.display = 'flex';
-                status.classList.add(type);
-                status.innerHTML = `<span class="icon">${type === 'error' ? '⚠' : '✓'}</span> ${message}`;
-            }
+    <!-- Hero -->
+    <div class="hero" id="overview">
+      <h1>Decryptor API</h1>
+      <p>Unified REST API for decrypting VPN and proxy config files. Supports HTTP Custom, EHI, NPVT, SSC, and Dark Tunnel formats — upload a file, send base64, paste a string, or fetch from a cloud URL.</p>
+      <div class="hero-meta">
+        <div class="hero-meta-item"><div class="dot"></div>5 supported formats</div>
+        <div class="hero-meta-item"><div class="dot"></div>File upload, base64 &amp; string input</div>
+        <div class="hero-meta-item"><div class="dot"></div>Cloud link fetch (EHI)</div>
+        <div class="hero-meta-item"><div class="dot"></div>Max 10 MB per file</div>
+      </div>
+    </div>
 
-            function showSpinner(show) {
-                spinner.style.display = show ? 'block' : 'none';
-                decryptBtn.disabled = show;
-            }
+    <!-- Supported Formats -->
+    <div class="section" id="formats">
+      <div class="section-header">
+        <h2>Supported Formats</h2>
+        <p>The API auto-detects the format from the file extension, or falls back to magic-byte inspection.</p>
+      </div>
+      <div class="format-grid">
+        <div class="format-card"><div class="format-ext">.hc</div><div class="format-name">HTTP Custom</div></div>
+        <div class="format-card"><div class="format-ext">.ehi</div><div class="format-name">EHI Config</div></div>
+        <div class="format-card"><div class="format-ext">.npvt</div><div class="format-name">NPVT Config</div></div>
+        <div class="format-card"><div class="format-ext">.ssc</div><div class="format-name">SSC Config</div></div>
+        <div class="format-card"><div class="format-ext">.dark</div><div class="format-name">Dark Tunnel</div></div>
+        <div class="format-card"><div class="format-ext">.darktunnel</div><div class="format-name">Dark Tunnel (alt)</div></div>
+        <div class="format-card"><div class="format-ext">.darkcloud</div><div class="format-name">Dark Cloud</div></div>
+      </div>
 
-            function clearOutput() {
-                output.style.display = 'none';
-                outputBody.textContent = '';
-                outputBody.innerHTML = '';
-                setStatus('', '');
-            }
+      <hr class="divider" />
 
-            function displayOutput(text) {
-                // Ensure we have a string
-                let outputText = text;
-                if (typeof text === 'object') {
-                    outputText = JSON.stringify(text, null, 2);
-                }
-                
-                output.style.display = 'flex';
-                
-                // Try to parse as JSON for syntax highlighting
-                try {
-                    const parsed = JSON.parse(outputText);
-                    const formatted = JSON.stringify(parsed, null, 2);
-                    outputBody.textContent = formatted;
-                    const highlighted = formatted
-                        .replace(/("(?:[^"\\]|\\.)*")(?=\s*:)/g, '<span class="json-key">$1</span>')
-                        .replace(/: ("(?:[^"\\]|\\.)*")/g, ': <span class="json-string">$1</span>')
-                        .replace(/: (\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-                        .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
-                        .replace(/: (null)/g, ': <span class="json-null">$1</span>');
-                    outputBody.innerHTML = highlighted;
-                } catch {
-                    // Not JSON - display as plain text
-                    outputBody.textContent = outputText;
-                }
-            }
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <div>When a filename has no recognised extension, the API checks the first bytes of the file (magic bytes) to detect <code style="font-family:var(--mono);font-size:12px">.npvt</code> and <code style="font-family:var(--mono);font-size:12px">.ssc</code> automatically.</div>
+      </div>
 
-            // ─── File handling ────────────────────────────────────────────
-            function handleFile(file) {
-                if (!file) return;
-                selectedFile = file;
-                fileName.textContent = file.name;
-                fileSize.textContent = formatSize(file.size);
-                fileInfo.style.display = 'flex';
-                setStatus(`Ready: ${file.name}`, 'success');
-                clearOutput();
-            }
+      <div class="card" style="margin-top:0">
+        <div class="card-header">Response envelope</div>
+        <pre class="code-block" style="margin:0;border:none;border-radius:0">{
+  "status":    "success",
+  "extension": ".hc",
+  "filename":  "config.hc",
+  "decrypted": "...decrypted content..."
+}</pre>
+      </div>
+    </div>
 
-            dropZone.addEventListener('click', () => fileInput.click());
-            dropZone.addEventListener('dragover', (e) => { e.preventDefault();
-                dropZone.classList.add('dragover'); });
-            dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                if (e.dataTransfer.files.length) {
-                    handleFile(e.dataTransfer.files[0]);
-                }
-            });
-            fileInput.addEventListener('change', () => {
-                if (fileInput.files.length) {
-                    handleFile(fileInput.files[0]);
-                }
-            });
+    <!-- ─── /health ─── -->
+    <div class="section" id="health">
+      <div class="endpoint-header">
+        <span class="endpoint-method get">GET</span>
+        <span class="endpoint-path">/health</span>
+      </div>
+      <div class="endpoint-desc">Returns the API status, version, list of supported extensions, and a summary of all available endpoints. Use this to verify the service is reachable.</div>
 
-            // ─── Clear ────────────────────────────────────────────────────
-            clearBtn.addEventListener('click', () => {
-                selectedFile = null;
-                fileInput.value = '';
-                fileInfo.style.display = 'none';
-                stringInput.value = '';
-                clearOutput();
-                setStatus('', '');
-            });
+      <div class="card">
+        <div class="card-header">Parameters</div>
+        <table class="params-table">
+          <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr>
+            <td colspan="4" style="text-align:center;color:var(--text3);font-size:13px;padding:16px">No parameters — this is a plain GET request.</td>
+          </tr>
+        </table>
+      </div>
 
-            // ─── Decrypt ──────────────────────────────────────────────────
-            decryptBtn.addEventListener('click', async () => {
-                let endpoint = '/decrypt';
-                let body;
+      <div class="try-section">
+        <h4>Try It</h4>
+        <button class="btn btn-primary" onclick="testHealth()">
+          <span class="spinner" id="health-spinner"></span>
+          <span>Send Request</span>
+        </button>
+        <div class="response-box" id="health-response">
+          <div class="response-header">
+            <div class="response-status">
+              <span class="status-badge" id="health-badge"></span>
+              <span id="health-time" style="color:var(--text3)"></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('health-pre')">Copy</button>
+          </div>
+          <pre class="response-pre" id="health-pre"></pre>
+        </div>
+      </div>
 
-                if (activeTab === 'file') {
-                    if (!selectedFile) {
-                        setStatus('Please select a file first.', 'error');
-                        return;
-                    }
-                    const formData = new FormData();
-                    formData.append('file', selectedFile);
-                    body = formData;
-                } else {
-                    const darkString = stringInput.value.trim();
-                    if (!darkString) {
-                        setStatus('Please paste a dark tunnel string.', 'error');
-                        return;
-                    }
-                    endpoint = '/decrypt/darktunnel';
-                    body = JSON.stringify({ string: darkString });
-                }
+      <div class="examples-grid">
+        <div class="example-card">
+          <div class="example-card-header">curl</div>
+          <pre>curl https://your-domain.replit.app/health</pre>
+        </div>
+        <div class="example-card">
+          <div class="example-card-header">Response</div>
+          <pre>{
+  "status": "healthy",
+  "version": "2.1.0",
+  "supported_extensions": [".hc", ".ehi", "..."],
+  "endpoints": { ... }
+}</pre>
+        </div>
+      </div>
+    </div>
 
-                showSpinner(true);
-                setStatus('Decrypting...', 'success');
+    <!-- ─── /decrypt (file upload) ─── -->
+    <div class="section" id="decrypt-file">
+      <div class="endpoint-header">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/decrypt</span>
+      </div>
+      <div class="endpoint-desc">Upload a config file using <code style="font-family:var(--mono);font-size:13px">multipart/form-data</code>. The field name must be <code style="font-family:var(--mono);font-size:13px">file</code>. The API infers the decryptor from the filename extension. Maximum file size: <strong>10 MB</strong>.</div>
 
-                try {
-                    const headers = activeTab === 'string' ? { 'Content-Type': 'application/json' } : {};
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: headers,
-                        body: body
-                    });
+      <div class="card">
+        <div class="card-header">Parameters · multipart/form-data</div>
+        <table class="params-table">
+          <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr>
+            <td><span class="param-name">file</span></td>
+            <td><span class="param-type">binary</span></td>
+            <td><span class="param-required">required</span></td>
+            <td class="param-desc">The encrypted config file. The filename extension determines which decryptor is used.</td>
+          </tr>
+        </table>
+      </div>
 
-                    const result = await response.json();
+      <div class="try-section">
+        <h4>Try It</h4>
+        <div class="form-group">
+          <label class="form-label">File</label>
+          <div class="drop-zone" id="file-dz" onclick="document.getElementById('file-input').click()"
+               ondragover="dzDragover(event,'file-dz')" ondragleave="dzDragleave('file-dz')" ondrop="dzDrop(event,'file-input','file-dz')">
+            <div class="dz-icon">📂</div>
+            <div class="dz-text">Click or drag a config file here</div>
+            <div class="dz-hint">Supported: .hc &nbsp;·&nbsp; .ehi &nbsp;·&nbsp; .npvt &nbsp;·&nbsp; .ssc &nbsp;·&nbsp; .dark &nbsp;·&nbsp; .darktunnel &nbsp;·&nbsp; .darkcloud</div>
+            <input type="file" id="file-input" onchange="onFileSelected('file-input','file-selected')" />
+          </div>
+          <div class="file-selected" id="file-selected"></div>
+        </div>
+        <button class="btn btn-primary" onclick="testDecryptFile()" id="decrypt-file-btn">
+          <span class="spinner" id="decrypt-file-spinner"></span>
+          <span>Decrypt File</span>
+        </button>
 
-                    if (!response.ok) {
-                        throw new Error(result.error || 'Server error');
-                    }
+        <div class="response-box" id="decrypt-file-response">
+          <div class="response-header">
+            <div class="response-status">
+              <span class="status-badge" id="decrypt-file-badge"></span>
+              <span id="decrypt-file-time" style="color:var(--text3)"></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('decrypt-file-pre')">Copy</button>
+          </div>
+          <pre class="response-pre" id="decrypt-file-pre"></pre>
+        </div>
+      </div>
 
-                    if (result.status !== 'success') {
-                        throw new Error(result.error || 'Decryption failed');
-                    }
+      <div class="examples-grid">
+        <div class="example-card">
+          <div class="example-card-header">curl</div>
+          <pre>curl -X POST /decrypt \
+  -F "file=@config.hc"</pre>
+        </div>
+        <div class="example-card">
+          <div class="example-card-header">Success Response</div>
+          <pre>{
+  "status":    "success",
+  "extension": ".hc",
+  "filename":  "config.hc",
+  "decrypted": "HABIBI HTTP CUSTOM SCRIPT\n..."
+}</pre>
+        </div>
+      </div>
+    </div>
 
-                    // Get the decrypted content - handle different response formats
-                    let outputText = null;
-                    if (result.decrypted) {
-                        outputText = result.decrypted;
-                    } else if (result.formatted) {
-                        outputText = result.formatted;
-                    } else {
-                        // If we have a success but no decrypted field, stringify the whole result
-                        outputText = JSON.stringify(result, null, 2);
-                    }
+    <!-- ─── /decrypt/base64 ─── -->
+    <div class="section" id="decrypt-base64">
+      <div class="endpoint-header">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/decrypt/base64</span>
+      </div>
+      <div class="endpoint-desc">Send an encrypted file as a base64-encoded string inside a JSON body. Useful when you cannot send multipart form data (e.g. from mobile apps or scripted environments). Data-URIs are accepted — the <code style="font-family:var(--mono);font-size:13px">data:…;base64,</code> prefix is stripped automatically.</div>
 
-                    // If outputText is an object, stringify it
-                    if (typeof outputText === 'object') {
-                        outputText = JSON.stringify(outputText, null, 2);
-                    }
+      <div class="card">
+        <div class="card-header">Body · application/json</div>
+        <table class="params-table">
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr>
+            <td><span class="param-name">file</span></td>
+            <td><span class="param-type">string</span></td>
+            <td><span class="param-required">required</span></td>
+            <td class="param-desc">Base64-encoded content of the encrypted config file.</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">filename</span></td>
+            <td><span class="param-type">string</span></td>
+            <td><span class="param-optional">optional</span></td>
+            <td class="param-desc">Original filename including extension (e.g. <code style="font-family:var(--mono);font-size:12px">config.ehi</code>). Used to pick the correct decryptor. Defaults to <code style="font-family:var(--mono);font-size:12px">unknown.bin</code>.</td>
+          </tr>
+        </table>
+      </div>
 
-                    setStatus(`✅ Decrypted successfully`, 'success');
-                    displayOutput(outputText);
+      <div class="try-section">
+        <h4>Try It</h4>
+        <div class="form-group">
+          <label class="form-label">filename <span style="color:var(--text3)">(optional — include extension)</span></label>
+          <input class="form-input" id="b64-filename" type="text" placeholder="config.ehi" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">file <span style="color:var(--text3)">(base64 string)</span></label>
+          <textarea class="form-textarea" id="b64-data" placeholder="Paste base64-encoded file content…"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:0">
+          <button class="btn btn-primary" onclick="testDecryptBase64()">
+            <span class="spinner" id="b64-spinner"></span>
+            <span>Decrypt</span>
+          </button>
+          <label style="font-size:12px;color:var(--text3);cursor:pointer">
+            <input type="file" id="b64-file-picker" style="display:none" onchange="loadFileAsBase64()" />
+            or <span style="color:var(--accent);text-decoration:underline" onclick="document.getElementById('b64-file-picker').click()">pick a file</span> to auto-fill
+          </label>
+        </div>
 
-                } catch (err) {
-                    setStatus(`❌ ${err.message}`, 'error');
-                } finally {
-                    showSpinner(false);
-                }
-            });
+        <div class="response-box" id="b64-response">
+          <div class="response-header">
+            <div class="response-status">
+              <span class="status-badge" id="b64-badge"></span>
+              <span id="b64-time" style="color:var(--text3)"></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('b64-pre')">Copy</button>
+          </div>
+          <pre class="response-pre" id="b64-pre"></pre>
+        </div>
+      </div>
 
-            // ─── EHI Cloud handling ──────────────────────────────────────────
-            const ehiInput = document.getElementById('ehiInput');
-            const fetchEhiBtn = document.getElementById('fetchEhiBtn');
+      <div class="examples-grid">
+        <div class="example-card">
+          <div class="example-card-header">curl</div>
+          <pre>curl -X POST /decrypt/base64 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "file": "SGFiaWJpIEhUVFAgQ3VzdG9t...",
+    "filename": "config.hc"
+  }'</pre>
+        </div>
+        <div class="example-card">
+          <div class="example-card-header">Python</div>
+          <pre>import base64, requests
+with open("config.hc","rb") as f:
+    b64 = base64.b64encode(f.read()).decode()
+r = requests.post("/decrypt/base64",
+    json={"file": b64, "filename": "config.hc"})
+print(r.json())</pre>
+        </div>
+      </div>
+    </div>
 
-            fetchEhiBtn.addEventListener('click', async () => {
-                const input = ehiInput.value.trim();
-                if (!input) {
-                    setStatus('Please enter an EHI cloud link or key.', 'error');
-                    return;
-                }
-                
-                // Determine if it's a URL or key
-                let url = input;
-                if (!input.startsWith('http')) {
-                    url = `https://ehi.link/${input}`;
-                }
-                
-                showSpinner(true);
-                setStatus('Fetching and decrypting EHI from cloud...', 'success');
-                
-                try {
-                    const response = await fetch('/decrypt/ehi-cloud', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: url })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(result.error || 'Server error');
-                    }
-                    
-                    if (result.status !== 'success') {
-                        throw new Error(result.error || 'Decryption failed');
-                    }
-                    
-                    let outputText = result.decrypted || result.formatted || JSON.stringify(result, null, 2);
-                    if (typeof outputText === 'object') {
-                        outputText = JSON.stringify(outputText, null, 2);
-                    }
-                    
-                    setStatus(`✅ Decrypted EHI from ${result.source || url}`, 'success');
-                    displayOutput(outputText);
-                    
-                } catch (err) {
-                    setStatus(`❌ ${err.message}`, 'error');
-                } finally {
-                    showSpinner(false);
-                }
-            });
+    <!-- ─── /decrypt/darktunnel ─── -->
+    <div class="section" id="decrypt-darktunnel">
+      <div class="endpoint-header">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/decrypt/darktunnel</span>
+      </div>
+      <div class="endpoint-desc">Decrypt a Dark Tunnel configuration string. The string can include the <code style="font-family:var(--mono);font-size:13px">darktunnel://</code> prefix — it is stripped automatically. Whitespace is also cleaned before decryption.</div>
 
-            // Allow Enter key in EHI input
-            ehiInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    fetchEhiBtn.click();
-                }
-            });
+      <div class="card">
+        <div class="card-header">Body · application/json</div>
+        <table class="params-table">
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr>
+            <td><span class="param-name">string</span></td>
+            <td><span class="param-type">string</span></td>
+            <td><span class="param-required">required</span></td>
+            <td class="param-desc">The Dark Tunnel config string. May include the <code style="font-family:var(--mono);font-size:12px">darktunnel://</code> scheme prefix.</td>
+          </tr>
+        </table>
+      </div>
 
-            // ─── Copy ─────────────────────────────────────────────────────
-            copyBtn.addEventListener('click', () => {
-                const text = outputBody.textContent || outputBody.innerText;
-                if (!text) return;
-                navigator.clipboard.writeText(text).then(() => {
-                    const original = copyBtn.textContent;
-                    copyBtn.textContent = '✔';
-                    setTimeout(() => copyBtn.textContent = original, 1500);
-                }).catch(() => {
-                    const range = document.createRange();
-                    range.selectNode(outputBody);
-                    window.getSelection().removeAllRanges();
-                    window.getSelection().addRange(range);
-                    document.execCommand('copy');
-                    window.getSelection().removeAllRanges();
-                    const original = copyBtn.textContent;
-                    copyBtn.textContent = '✔';
-                    setTimeout(() => copyBtn.textContent = original, 1500);
-                });
-            });
+      <div class="alert alert-warn" style="margin-top:16px">
+        <span>⚠️</span>
+        <div>The string is decoded with the <strong>Dark Cloud decryptor</strong>. Make sure the string is a valid Dark Tunnel / Dark Cloud encoded payload — raw JSON or plain text will fail.</div>
+      </div>
 
-            clearOutput();
-        })();
-    </script>
+      <div class="try-section">
+        <h4>Try It</h4>
+        <div class="form-group">
+          <label class="form-label">string</label>
+          <textarea class="form-textarea" id="dt-string" placeholder='darktunnel://…  or just paste the encoded payload'></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="testDarkTunnel()">
+          <span class="spinner" id="dt-spinner"></span>
+          <span>Decrypt String</span>
+        </button>
+
+        <div class="response-box" id="dt-response">
+          <div class="response-header">
+            <div class="response-status">
+              <span class="status-badge" id="dt-badge"></span>
+              <span id="dt-time" style="color:var(--text3)"></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('dt-pre')">Copy</button>
+          </div>
+          <pre class="response-pre" id="dt-pre"></pre>
+        </div>
+      </div>
+
+      <div class="examples-grid">
+        <div class="example-card">
+          <div class="example-card-header">curl</div>
+          <pre>curl -X POST /decrypt/darktunnel \
+  -H "Content-Type: application/json" \
+  -d '{"string": "darktunnel://ABC123..."}'</pre>
+        </div>
+        <div class="example-card">
+          <div class="example-card-header">Success Response</div>
+          <pre>{
+  "status": "success",
+  "type":   "dark_tunnel",
+  "decrypted": { ... },
+  "formatted": "..full text.."
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── /decrypt/ehi-cloud ─── -->
+    <div class="section" id="decrypt-ehi-cloud">
+      <div class="endpoint-header">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/decrypt/ehi-cloud</span>
+      </div>
+      <div class="endpoint-desc">Fetch an EHI config file from a <code style="font-family:var(--mono);font-size:13px">https://ehi.link/…</code> cloud URL and decrypt it on the fly. You can supply the full URL or just the key (the short code at the end of the URL).</div>
+
+      <div class="card">
+        <div class="card-header">Body · application/json</div>
+        <table class="params-table">
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr>
+            <td><span class="param-name">url</span></td>
+            <td><span class="param-type">string</span></td>
+            <td><span class="param-optional">optional*</span></td>
+            <td class="param-desc">Full EHI cloud URL, e.g. <code style="font-family:var(--mono);font-size:12px">https://ehi.link/WPKKACR9</code></td>
+          </tr>
+          <tr>
+            <td><span class="param-name">key</span></td>
+            <td><span class="param-type">string</span></td>
+            <td><span class="param-optional">optional*</span></td>
+            <td class="param-desc">Short key from the URL, e.g. <code style="font-family:var(--mono);font-size:12px">WPKKACR9</code>. Used to build the URL automatically.</td>
+          </tr>
+        </table>
+        <div style="padding:10px 18px;font-size:12px;color:var(--text3);border-top:1px solid var(--border)">* Either <code style="font-family:var(--mono)">url</code> or <code style="font-family:var(--mono)">key</code> must be provided.</div>
+      </div>
+
+      <div class="try-section">
+        <h4>Try It</h4>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">url <span style="color:var(--text3)">(full)</span></label>
+            <input class="form-input" id="ehi-url" type="text" placeholder="https://ehi.link/WPKKACR9" oninput="syncEhiFields('url')" />
+          </div>
+          <div style="color:var(--text3);font-size:13px;padding-top:18px">or</div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">key <span style="color:var(--text3)">(short code only)</span></label>
+            <input class="form-input" id="ehi-key" type="text" placeholder="WPKKACR9" oninput="syncEhiFields('key')" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="testEhiCloud()">
+          <span class="spinner" id="ehi-spinner"></span>
+          <span>Fetch &amp; Decrypt</span>
+        </button>
+
+        <div class="response-box" id="ehi-response">
+          <div class="response-header">
+            <div class="response-status">
+              <span class="status-badge" id="ehi-badge"></span>
+              <span id="ehi-time" style="color:var(--text3)"></span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyResponse('ehi-pre')">Copy</button>
+          </div>
+          <pre class="response-pre" id="ehi-pre"></pre>
+        </div>
+      </div>
+
+      <div class="examples-grid">
+        <div class="example-card">
+          <div class="example-card-header">curl · with URL</div>
+          <pre>curl -X POST /decrypt/ehi-cloud \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://ehi.link/WPKKACR9"}'</pre>
+        </div>
+        <div class="example-card">
+          <div class="example-card-header">curl · with key</div>
+          <pre>curl -X POST /decrypt/ehi-cloud \
+  -H "Content-Type: application/json" \
+  -d '{"key": "WPKKACR9"}'</pre>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ─── Helpers ─── */
+function $(id) { return document.getElementById(id); }
+
+function setActive(el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function fmtMs(ms) {
+  return ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(2) + ' s';
+}
+
+function syntaxHL(json) {
+  return json
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let cls = 'json-num';
+      if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-str';
+      else if (/true|false/.test(m)) cls = 'json-bool';
+      else if (/null/.test(m)) cls = 'json-null';
+      return `<span class="${cls}">${m}</span>`;
+    });
+}
+
+function showResponse(prefix, status, body, ms) {
+  const box    = $(prefix + '-response');
+  const badge  = $(prefix + '-badge');
+  const time   = $(prefix + '-time');
+  const pre    = $(prefix + '-pre');
+  box.classList.add('show');
+  const ok = status >= 200 && status < 300;
+  badge.className = 'status-badge ' + (ok ? 'ok' : 'err');
+  badge.textContent = status;
+  time.textContent = ms ? fmtMs(ms) : '';
+  try {
+    const parsed = JSON.stringify(JSON.parse(body), null, 2);
+    pre.innerHTML = syntaxHL(parsed);
+  } catch {
+    pre.textContent = body;
+  }
+}
+
+function setLoading(prefix, on) {
+  const sp = $(prefix + '-spinner');
+  if (sp) sp.style.display = on ? 'block' : 'none';
+  const btn = document.querySelector(`#${prefix.replace('-','')}-btn`) || null;
+}
+
+function copyResponse(preId) {
+  navigator.clipboard.writeText($(preId).textContent).catch(() => {});
+}
+
+/* ─── API status ─── */
+async function pingHealth() {
+  try {
+    const r = await fetch('/health');
+    const dot = $('sidebar-dot');
+    const lbl = $('sidebar-status');
+    if (r.ok) {
+      const j = await r.json();
+      dot.className = 'status-dot online';
+      lbl.textContent = 'API online · v' + (j.version || '?');
+    } else {
+      dot.className = 'status-dot error';
+      lbl.textContent = 'API error';
+    }
+  } catch {
+    $('sidebar-dot').className = 'status-dot error';
+    $('sidebar-status').textContent = 'Unreachable';
+  }
+}
+
+/* ─── /health ─── */
+async function testHealth() {
+  const sp = $('health-spinner'); sp.style.display = 'block';
+  const t0 = Date.now();
+  try {
+    const r = await fetch('/health');
+    const body = await r.text();
+    showResponse('health', r.status, body, Date.now() - t0);
+  } catch(e) {
+    showResponse('health', 0, e.message, Date.now() - t0);
+  } finally { sp.style.display = 'none'; }
+}
+
+/* ─── Drop zone helpers ─── */
+function dzDragover(e, id) { e.preventDefault(); $(id).classList.add('dragover'); }
+function dzDragleave(id) { $(id).classList.remove('dragover'); }
+function dzDrop(e, inputId, dzId) {
+  e.preventDefault(); dzDragleave(dzId);
+  const input = $(inputId);
+  const dt = new DataTransfer();
+  dt.items.add(e.dataTransfer.files[0]);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change'));
+}
+function onFileSelected(inputId, selectedId) {
+  const file = $(inputId).files[0];
+  if (!file) return;
+  const el = $(selectedId);
+  el.style.display = 'flex';
+  el.innerHTML = `<span>✅</span><span>${file.name}</span><span style="color:var(--text3);margin-left:auto">${(file.size/1024).toFixed(1)} KB</span>`;
+}
+
+/* ─── /decrypt (file) ─── */
+async function testDecryptFile() {
+  const sp = $('decrypt-file-spinner'); sp.style.display = 'block';
+  const t0 = Date.now();
+  const fileInput = $('file-input');
+  if (!fileInput.files[0]) {
+    showResponse('decrypt-file', 400, JSON.stringify({error:'Please select a file first'}), 0);
+    sp.style.display = 'none';
+    return;
+  }
+  try {
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    const r = await fetch('/decrypt', { method: 'POST', body: fd });
+    const body = await r.text();
+    showResponse('decrypt-file', r.status, body, Date.now() - t0);
+  } catch(e) {
+    showResponse('decrypt-file', 0, e.message, Date.now() - t0);
+  } finally { sp.style.display = 'none'; }
+}
+
+/* ─── /decrypt/base64 · pick file ─── */
+function loadFileAsBase64() {
+  const file = $('b64-file-picker').files[0];
+  if (!file) return;
+  $('b64-filename').value = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let b64 = e.target.result;
+    if (b64.includes(',')) b64 = b64.split(',')[1];
+    $('b64-data').value = b64;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ─── /decrypt/base64 ─── */
+async function testDecryptBase64() {
+  const sp = $('b64-spinner'); sp.style.display = 'block';
+  const t0 = Date.now();
+  const b64 = $('b64-data').value.trim();
+  if (!b64) {
+    showResponse('b64', 400, JSON.stringify({error:'Paste base64 data or pick a file'}), 0);
+    sp.style.display = 'none'; return;
+  }
+  try {
+    const payload = { file: b64 };
+    const fn = $('b64-filename').value.trim();
+    if (fn) payload.filename = fn;
+    const r = await fetch('/decrypt/base64', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const body = await r.text();
+    showResponse('b64', r.status, body, Date.now() - t0);
+  } catch(e) {
+    showResponse('b64', 0, e.message, Date.now() - t0);
+  } finally { sp.style.display = 'none'; }
+}
+
+/* ─── /decrypt/darktunnel ─── */
+async function testDarkTunnel() {
+  const sp = $('dt-spinner'); sp.style.display = 'block';
+  const t0 = Date.now();
+  const s = $('dt-string').value.trim();
+  if (!s) {
+    showResponse('dt', 400, JSON.stringify({error:'Please paste a dark tunnel string'}), 0);
+    sp.style.display = 'none'; return;
+  }
+  try {
+    const r = await fetch('/decrypt/darktunnel', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({string: s})
+    });
+    const body = await r.text();
+    showResponse('dt', r.status, body, Date.now() - t0);
+  } catch(e) {
+    showResponse('dt', 0, e.message, Date.now() - t0);
+  } finally { sp.style.display = 'none'; }
+}
+
+/* ─── /decrypt/ehi-cloud · sync fields ─── */
+function syncEhiFields(source) {
+  if (source === 'key') {
+    const k = $('ehi-key').value.trim();
+    $('ehi-url').value = k ? 'https://ehi.link/' + k : '';
+  } else {
+    const u = $('ehi-url').value.trim();
+    const m = u.match(/https:\/\/ehi\.link\/(.+)/);
+    $('ehi-key').value = m ? m[1] : '';
+  }
+}
+
+/* ─── /decrypt/ehi-cloud ─── */
+async function testEhiCloud() {
+  const sp = $('ehi-spinner'); sp.style.display = 'block';
+  const t0 = Date.now();
+  const url = $('ehi-url').value.trim();
+  const key = $('ehi-key').value.trim();
+  if (!url && !key) {
+    showResponse('ehi', 400, JSON.stringify({error:'Enter a URL or a key'}), 0);
+    sp.style.display = 'none'; return;
+  }
+  try {
+    const payload = {};
+    if (url) payload.url = url;
+    else payload.key = key;
+    const r = await fetch('/decrypt/ehi-cloud', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const body = await r.text();
+    showResponse('ehi', r.status, body, Date.now() - t0);
+  } catch(e) {
+    showResponse('ehi', 0, e.message, Date.now() - t0);
+  } finally { sp.style.display = 'none'; }
+}
+
+/* ─── Init ─── */
+pingHealth();
+setInterval(pingHealth, 30000);
+
+// Highlight active nav on scroll
+const sections = ['overview','formats','health','decrypt-file','decrypt-base64','decrypt-darktunnel','decrypt-ehi-cloud'];
+const navLinks = document.querySelectorAll('.nav-item[href]');
+window.addEventListener('scroll', () => {
+  let cur = '';
+  for (const id of sections) {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 120) cur = id;
+  }
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+}, { passive: true });
+</script>
 </body>
 </html>
