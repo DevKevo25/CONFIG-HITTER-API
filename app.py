@@ -4,6 +4,7 @@ import os
 import json
 import base64
 import logging
+import requests
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from decryptors import DECRYPTORS
@@ -192,6 +193,89 @@ def decrypt_base64():
         logger.exception('Error in /decrypt/base64')
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
+# ─── EHI Cloud Decrypt Endpoint ──────────────────────────────────
+@app.route('/decrypt/ehi-cloud', methods=['POST'])
+def decrypt_ehi_cloud():
+    """
+    Decrypt EHI from cloud link.
+    Accepts JSON: {"url": "https://ehi.link/WPKKACR9"} or {"key": "WPKKACR9"}
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Missing JSON body'}), 400
+        
+        # Get URL or key
+        url = data.get('url', '').strip()
+        key = data.get('key', '').strip()
+        
+        if not url and not key:
+            return jsonify({'error': 'Missing "url" or "key" field'}), 400
+        
+        # Construct URL if key provided
+        if key and not url:
+            url = f"https://ehi.link/{key}"
+        
+        # Validate URL
+        if not url.startswith('https://ehi.link/'):
+            return jsonify({'error': 'Invalid EHI cloud URL. Must be https://ehi.link/...'}), 400
+        
+        logger.info(f'Fetching EHI from cloud: {url}')
+        
+        # Fetch the file
+        try:
+            response = requests.get(url, timeout=30, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f'Failed to fetch EHI: {e}')
+            return jsonify({'error': f'Failed to fetch from cloud: {str(e)}'}), 400
+        
+        # Get the content
+        file_bytes = response.content
+        logger.info(f'Downloaded {len(file_bytes)} bytes from {url}')
+        
+        # Check if it's a valid EHI file (magic check)
+        if len(file_bytes) < 10:
+            return jsonify({'error': 'Downloaded file is too small'}), 400
+        
+        # Decrypt using EHIDecryptor
+        result = EHIDecryptor.execute(file_bytes)
+        
+        if result is None or result.startswith('❌'):
+            return jsonify({'error': result or 'Decryption failed'}), 400
+        
+        # Parse the result to extract JSON
+        try:
+            json_start = result.find('{')
+            if json_start != -1:
+                json_end = result.rfind('}') + 1
+                if json_end > json_start:
+                    parsed = json.loads(result[json_start:json_end])
+                    return jsonify({
+                        'status': 'success',
+                        'type': 'ehi_cloud',
+                        'source': url,
+                        'decrypted': parsed,
+                        'formatted': result
+                    })
+        except:
+            pass
+        
+        return jsonify({
+            'status': 'success',
+            'type': 'ehi_cloud',
+            'source': url,
+            'decrypted': result,
+            'formatted': result
+        })
+        
+    except Exception as e:
+        logger.exception('Error in /decrypt/ehi-cloud')
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -214,5 +298,6 @@ if __name__ == '__main__':
     print(f"🐞 Debug: {DEBUG}")
     print("=" * 60)
     print("🔥 Using dark_cloud_decryptor for string decryption")
+    print("  POST /decrypt/ehi-cloud   - EHI cloud link")
     print("=" * 60)
     app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
