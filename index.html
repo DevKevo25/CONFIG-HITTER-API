@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ DECRYPTOR · v2.0</title>
+    <title>⚡ DECRYPTOR · v2.1</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        /* ─── Reset & Base ─── */
         * {
             margin: 0;
             padding: 0;
@@ -27,7 +26,6 @@
                 radial-gradient(circle at 80% 50%, rgba(0, 200, 255, 0.03) 0%, transparent 60%);
             background-attachment: fixed;
         }
-        /* ─── Glow overlay ─── */
         .glow {
             position: fixed;
             top: 0;
@@ -44,8 +42,6 @@
             );
             z-index: -1;
         }
-
-        /* ─── Container ─── */
         .container {
             max-width: 960px;
             width: 100%;
@@ -60,8 +56,6 @@
         .container:hover {
             border-color: rgba(0, 255, 200, 0.4);
         }
-
-        /* ─── Header ─── */
         .header {
             display: flex;
             align-items: center;
@@ -101,17 +95,48 @@
             color: #88e0d0;
             letter-spacing: 1px;
         }
-
-        /* ─── Drop Zone ─── */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
+            padding-bottom: 0.5rem;
+        }
+        .tab {
+            background: transparent;
+            border: none;
+            color: #557777;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            padding: 0.5rem 1.2rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .tab:hover {
+            color: #88b0b0;
+            background: rgba(0, 255, 200, 0.05);
+        }
+        .tab.active {
+            color: #00ffcc;
+            background: rgba(0, 255, 200, 0.08);
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.05);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
         .drop-zone {
             border: 2px dashed rgba(0, 255, 200, 0.3);
             border-radius: 18px;
-            padding: 3.5rem 2rem;
+            padding: 2.5rem 2rem;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
             background: rgba(0, 255, 200, 0.02);
-            position: relative;
         }
         .drop-zone:hover {
             border-color: #00ffcc;
@@ -124,12 +149,12 @@
             box-shadow: 0 0 40px rgba(0, 255, 200, 0.1);
         }
         .drop-zone .icon {
-            font-size: 3.5rem;
+            font-size: 3rem;
             margin-bottom: 0.5rem;
             opacity: 0.7;
         }
         .drop-zone .text {
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: #88b0b0;
         }
         .drop-zone .hint {
@@ -140,6 +165,33 @@
         }
         .drop-zone input[type="file"] {
             display: none;
+        }
+        .textarea-zone {
+            border: 2px solid rgba(0, 255, 200, 0.2);
+            border-radius: 18px;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.4);
+            transition: border-color 0.3s;
+        }
+        .textarea-zone:focus-within {
+            border-color: #00ffcc;
+            box-shadow: 0 0 30px rgba(0, 255, 200, 0.05);
+        }
+        .textarea-zone textarea {
+            width: 100%;
+            min-height: 120px;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #b0e0e0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            padding: 0.8rem;
+            resize: vertical;
+            line-height: 1.6;
+        }
+        .textarea-zone textarea::placeholder {
+            color: #446666;
         }
         .file-info {
             display: none;
@@ -163,10 +215,8 @@
             color: #669999;
             font-size: 0.8rem;
         }
-
-        /* ─── Buttons ─── */
         .actions {
-            margin-top: 2rem;
+            margin-top: 1.5rem;
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
@@ -208,8 +258,6 @@
             cursor: not-allowed;
             pointer-events: none;
         }
-
-        /* ─── Spinner ─── */
         .spinner {
             display: none;
             width: 20px;
@@ -223,10 +271,8 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        /* ─── Output ─── */
         .output {
-            margin-top: 2.5rem;
+            margin-top: 2rem;
             display: none;
             flex-direction: column;
             gap: 1rem;
@@ -269,7 +315,6 @@
             font-family: 'Fira Code', monospace;
             color: #c0e8e0;
             box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
-            transition: border-color 0.3s;
         }
         .output-body::-webkit-scrollbar {
             width: 6px;
@@ -284,8 +329,6 @@
         .output-body .json-number { color: #6ac8ff; }
         .output-body .json-boolean { color: #ff79c6; }
         .output-body .json-null { color: #ff79c6; }
-
-        /* ─── Status messages ─── */
         .status {
             margin-top: 1rem;
             padding: 0.6rem 1rem;
@@ -310,22 +353,19 @@
         .status .icon {
             font-size: 1.2rem;
         }
-
-        /* ─── Responsive ─── */
         @media (max-width: 640px) {
             .container { padding: 1.5rem 1rem; }
             .logo { font-size: 1.2rem; }
-            .drop-zone { padding: 2rem 1rem; }
+            .drop-zone { padding: 1.5rem 1rem; }
             .btn { padding: 0.6rem 1.2rem; font-size: 0.8rem; }
             .output-body { max-height: 300px; }
+            .tab { font-size: 0.75rem; padding: 0.4rem 0.8rem; }
         }
     </style>
 </head>
 <body>
     <div class="glow"></div>
-
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <div class="logo">
                 <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
@@ -335,40 +375,41 @@
                 </svg>
                 <span>DECRYPTOR</span>
             </div>
-            <div class="badge">⧩ v2.0 · 5 FORMATS</div>
+            <div class="badge">⧩ v2.1 · 5 FORMATS + STRING</div>
         </div>
 
-        <!-- Drop Zone -->
-        <div class="drop-zone" id="dropZone">
-            <div class="icon">📂</div>
-            <div class="text">Drop your config file here</div>
-            <div class="hint">or click to browse · .hc .ehi .npvt .ssc .dark</div>
-            <input type="file" id="fileInput" accept=".hc,.ehi,.npvt,.ssc,.dark">
+        <div class="tabs">
+            <button class="tab active" data-tab="file">📄 File</button>
+            <button class="tab" data-tab="string">🔗 Dark String</button>
         </div>
 
-        <!-- File Info -->
-        <div class="file-info" id="fileInfo">
-            <span class="name" id="fileName">config.hc</span>
-            <span class="size" id="fileSize">2.4 KB</span>
+        <div class="tab-content active" id="tab-file">
+            <div class="drop-zone" id="dropZone">
+                <div class="icon">📂</div>
+                <div class="text">Drop your config file here</div>
+                <div class="hint">or click to browse · .hc .ehi .npvt .ssc .dark</div>
+                <input type="file" id="fileInput" accept=".hc,.ehi,.npvt,.ssc,.dark">
+            </div>
+            <div class="file-info" id="fileInfo">
+                <span class="name" id="fileName">config.hc</span>
+                <span class="size" id="fileSize">2.4 KB</span>
+            </div>
         </div>
 
-        <!-- Actions -->
+        <div class="tab-content" id="tab-string">
+            <div class="textarea-zone">
+                <textarea id="stringInput" placeholder="Paste your dark tunnel string here...&#10;darktunnel://eyJ0eXBlIjoiU1NIIiwibmFtZSI6IkFJUlRFTCAyR0IgVEVTVCDwn5Sl8J-UpfCflKUiLCJzc2hUdW5uZWxDb25maWciOnsiaW5qZWN0Q29uZmlnIjp7ImVuYWJsZWQiOnRydWUsIm1vZGUiOiJQUk9YWSJ9fSwiZW5jcnlwdGVkTG9ja2VkQ29uZmlnIjoiRmZMakdwTVBuOTMyMnZUMTYwRnBUYk5xNXhKbWNaQ3VHZ3hESXFscnNOVjFja1ZrLVp1cUJEanllRXNCbjdnbEVJNnhWem8xQ3M2MjNqVXZhSndITkdtZkNjU0hmdGM1eG5tWWE1cG9mcUxlWGhZOUJ5eDdETkV6YzNuTVZNbUVfcjZHNWpFenE2S1MtUTVZdWhHR2w1RGRGNGhsSnpxcTM1TXhCNVlGM01YQXUtRERVSWp1OS16NGxQSXhyV3pfRTkwWlc2QnlBOFVMUWVKUDY0b2htR1c4WVQ5YlJ2Q2RsdE52MmcyRFNXUGt6U09WdHBWZU1xQ05UZU9IdEk3ODd3X2c0Yk90RXRmcDRhaE9lUElMR3dKY0VWMWMwWDBlMWxJUlBPX1NDNDFaYU94MFd2VEtlTjl3OEpmVjBZTlp1Q0p2cmlQQnpXUEFUWHZTMEVMNDJyWl9KaFlNWW5xWVlsT0lvWEdxLUJpUDNQenBDd2pqalpBQVBBaVFGTmxDX0JpZzB2U0p2VjZuLUZWZzBJdC00NFlBX3dIYjZ1SDBPVl82bXc4VW4zX2hGU3k4OXZDMWdSY1pnRS16bWt6Sk1KRkFKcFR1cE52SFUwblBDYlJETFlLZlI5R2ZncHlUV2hSWWF2ZERnWmVsR2U4OG5GZ3U0V0VyMFFGNHJVWEVzeFRkWmNKeEtNNG9FNWx4NGpZa3hCQnJ5enFHTGZseWxQUUxoUHJfQ2VsVGdHYkhocWJXVXNhb0EyU0dUTFJiV2RpWGpQZ21aa3lwV3k5VmV3SzVBdGxZM1NRMmV0N3VVOG0xcEdFMUVVMHc0Qi1FVW43RVgwOU8yekZQaDZfbjlWVVFoc3hKbXA3N1Bqckl0YnRNWmlOeUtSZ05pVXZId0lET1RrdmRVU1ZGWk04NE5CRXdaRm1TTUVrTjl0bVZPcGstb2ZkTmN6N044T0tfX09GR3hDSjNmRGQ0OU5JZ19YUEVSZHczX2g3eHlpZU02aUFiVHFtalZFNEYtd1hsV0hvc2dMQk1kWjgySU85aERXaUk0T3A3Wjc1YzJndmxsZVFJenJESmtJUFNWQkRqWDh4dzlnZGRtZWtKMTY0ZkhBVGQwNGVjZ2Z0REVpUF9PVHR5TWFOUjFLWWJ6S3hDcmVKMFVYa0Z0T0RoMnNlalR2Q1kySVpRclppenFJcmFzcW8zRWdKUkdWMS1ZVmljckwwc1o1eENXY3EzZl83SEtPUkwycktLOGFCN3pOZHpIOTZzN1o4Skh3bzJsaURuTGxsYU8tQUlZdkFzT000Yl8tR2JFbkZ0VHpXbVlqUDk5VXNDVXdWNzF5c1RsR2Y0SnNwMWdOUEpTTVF5VmJ3cVh2OTY5amF3UWdOVWFRcDVlclRvNTJ3RndMb3pKVFY1ZDM5dzJVV2tJRWVxTW5Ca2RvMVNhMnZHSE85YTUzRFR2QnpwN2phTjJnNzg2YkJRcTE2cnROODUyWkIzLUp0dHRwVDJBcktqSXNYTkw0bFJYZDVxdXQ5UHRpRGw3QlRiMWd1RTB1RW1yTFQ5bXlQTlRYRm03SG40R2MxRWd4Nk9OSmFhOEFvam5zOEJXQUJRNDM3R1NNNUR5bmZDUW00SnRBV1JtZURfNEx6MkJLcVdYbGJ3Ni1ZM3hZb3BGR1V6Q1BkMExJaXpvZmRCSWZKTVBvdEN1Z3lMQnR0dU9FSlBrMzYzMlE2ZF9fal9MRUI4RWZiV3FtbVI0TlF1bjdWLU96SjlCREdpVEJmSmdJcXJqakhtdzRoZFRnQWZJRmx0SzA1Y0s1WEpoXzdJcU01bUNuZF9JQ0xVWXM4T09EeVNfU0VqeGlTN1ZKZ0h4QTBlTHQxQ1FOZ3g2R3lYRnFYck9ydjRRYVNrRGRvcTU5bGdlUThfU3htZXpjT2R5c08wdEhDb3JBci1PTUZJZlhocThUMnRHdVNVY0RFdUVLMGRtcnVZWlNiSmF6cFFIa3FCaFlKYWZsRm4tV3BueFEtMVEyTHdPdXNVMHlBVzN4VUFNNE9aQWNocTczYjdLWWJUU0RHLWVJNGwwWll2Y0RudHdBblVBb0xMLVZwRS12ZkVOOGktOVZmWEs5bzZwMHRoMHpaQUJ5R2xrV0NjTXpQdGI4SW1NSVFYYXRhTHFIVEl6d0VxVG4xZWwyaDVvTzNaSkNTZDJHSnpLMDB3cjRWVDlyVUtJeFViMF9Wb0FNbncxX0tDX1lUZDRUaHo2Mnc1QVltQWtmcXh1aFdNdHNqcG1KNzkySy1BYUlfbVQyemlUZ2VqQWVfQ0dDM1E5Z2ZzMDBUWUNQUmkxYlZwTHJpSW9YeEw1a0daRW9pU3ZLN1U1OUw5T3VnS0ZLT0NMMXFKWlhhLW84Zk1WVEpLS3c2WmZvMC1sVzZrWGpVeGJVQ0k3d3FrdHROTkR2aUJrdG14bmk5U1AxMk5nNkFiQ0k0NDJ6anpFZklUangydjVnRy1oclotaFdiRGhFbUlQdHFWT2ptQ0tSZEhmVGczRUpTcnA3b184cUluOFg5bFhIYWRDN1ZwaHBIQnZ6bTJLTm5RdDhINC1McTk4akljVlFJZVhuTzJnZzg5WEtVVmFZaWRMNXdDSk43VVZzdF9qWmVpSlRVSGtrNUJmc0JGUjJEdXVvalVQelN2TnkzWUJNQ2owV0lsRnNwcG9pNWVYSjdFbW84aVpvblBkb2FuLTNZdkxsNFZJZlhld0Q2STlIWndSY2otTmFBc3NIZldJenE0NTJYUHZsaFRqUzFpZWNoWEZ1em81QWxaMldmVVdEU1ppMHlXTDZyTlg1ZldLamI5c3hNVnVsVlk0a2tLSlVNdDNLMXh6MnN0eFRHNkRYX3ZkQzRHVmZRU2o2TjRJVG1ybUY1ajVRNUpjQm1DRWhvQ0p6T09Ycl9fX3VydFVBQ3p5RVpIcUo5azFBUEdzRDk0X2RkVFpFbmFUX0RvNjR0S0IyY1BsNWNMaUt2TXk4RjNSdGN3RHlZX1N2WWYyRDlWNjQzUXczeUhXSmRBNFN2eVBobnFybDBuQjJIYTducWZUNGF0ZmQ0UGNoXzFGc0xSQ3pzU3cwaGpVUlR5VlRSZEZ1UmpHRjJUMWJEaHNMNlRST21uT3owNWRJVUhyclpCLWtZZllOcVl1WWJlcFRteDZHNWt6N2RITkk0WVpubm1TYjREeUI4dlg5UUl1UVRVYVlweURZNGsteG1NWFhrWkdqeGNibnFOTHk4WlR3cnpjWVdrWWtJczQ2bWx0aWRnOG50OFN4ODNUUzVMaTYzbEctQTBwNWg2SjhMNzhaaWx3UGU4M2g4Q21UYVZ4Q2o3Vk1WSklqcXZ5R19OemwxZTFwbWJ2WVhXbzkxaUVEdERhX2FNYkZUYUgwS1VFUGhYUnJ2Mm1FWUI4Q1ZFQ05kZmlwQ2tWc3JqcDdDTXZyR2lVUzR6X2Z0RGxOT3hsbEt5dThqMzNHRi05UXhZUUFLUkpPOEZpT24wQ1lEN2FxbWE2TEJCQmFKX0l5S0c5d19jTURfWjZDX3EwZ3lUckZITlRJTkNVLW81cm83eVJjN0ZpZ2FiTTA0UTkwenJseHp6Rl9OUUd6dElsbmp2Y2k4b1JRUFp3c2k2ZW5qdWw5ekFnQm5FWV9EcmRtTWlhZjZMcjZISVVYWEJscFhMYWxoR0diZXdRN2RneGh3NnNlZE5NaWp4YXVSZnB3X2ZWUXhDZ003MWl5ZGRwSWhJNDNXQWI0NmZ1VkUtV3FOUFlWbDZBRzJnQ2NKQ2Z6S3hGUXNzVUFJejJEMGpuODhRclR6ZUdUSlBjeC1KV2FyUGpwemg5QTFNb1dsdWd3cTNGdWhhbGNnZWprekFlNlkzMldScS1sSld6SlFjbVY1WUxucWlkU0hLeHJYOW5HNWp4a3VIWC1mc25faVVRS3UxTU9WNGtrVk94RnNTWmdFYlcxVXlYYTNRQUJzMlRvZ2thOWFidTZHVHpUWFhzejNwcHp4THFQY192RkhoTTF4bng5ckphWlhCRVRyeTRCR2RBc0tSQm9FVlcwdTlVOXh4d2J5ekFGYUVrY0pGV2JLdGZBb2hWVzRKVk9PSG5PNDVLakx4d0c2U1oxdnNrcVRRc25ZeTFNdTlUZ0lXWjBVWEk1SDdxM0V2Yl83U0Q5aTJTbUJEQzJuenhOVjM4NTg2bmhpVkY4LVJITXVqV2dsZlpYMG16NHBHMms1bWpDbW5YNml2LUJrcElqS0VnYUt6TW1zbGEyaG44WDcyTUN1TUNUai1KTTNDYjlGYTJMSm5QUmxUaDA0VXpIM1ZlSncteUdqeXk5cWlZQjYzVWRORTNQdWl0U0xQam40UE9SV1FnaFNjakJKNWFMa0hxWU5wREVoWVdjSXBPdVRicEtLWkJjT3llUEFjUVozY1lLdERTdmw4U3dHNk1HbkI2RnI4WXFDTjJtdnJodkctYnJfZFJLOU1BUmxMcml2NTNhT1lzU1hMY0JDb05VMzJzYWcyYzdFa2Fzbm5MdW9xUkZ4cm53cDVnaUprZ09HUDRiYU8ydUV6bEN6QTRUcS0xLXJ4YVd4Y0Myc1liOE1UaWRoYVNSOXBCUGViSkozSGNFUnUifQ=="></textarea>
+            </div>
+        </div>
+
         <div class="actions">
-            <button class="btn btn-primary" id="decryptBtn">
-                <span>⟳</span> DECRYPT
-            </button>
-            <button class="btn" id="clearBtn">
-                <span>✕</span> CLEAR
-            </button>
+            <button class="btn btn-primary" id="decryptBtn"><span>⟳</span> DECRYPT</button>
+            <button class="btn" id="clearBtn"><span>✕</span> CLEAR</button>
         </div>
 
-        <!-- Status -->
         <div class="status" id="status"></div>
-
-        <!-- Spinner -->
         <div class="spinner" id="spinner"></div>
 
-        <!-- Output -->
         <div class="output" id="output">
             <div class="output-header">
                 <span>⬢ DECRYPTED OUTPUT</span>
@@ -380,12 +421,13 @@
 
     <script>
         (function() {
-            // ─── Elements ──────────────────────────────────────────────────
+            // Elements
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
             const fileName = document.getElementById('fileName');
             const fileSize = document.getElementById('fileSize');
+            const stringInput = document.getElementById('stringInput');
             const decryptBtn = document.getElementById('decryptBtn');
             const clearBtn = document.getElementById('clearBtn');
             const status = document.getElementById('status');
@@ -393,8 +435,29 @@
             const output = document.getElementById('output');
             const outputBody = document.getElementById('outputBody');
             const copyBtn = document.getElementById('copyBtn');
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = {
+                file: document.getElementById('tab-file'),
+                string: document.getElementById('tab-string')
+            };
 
             let selectedFile = null;
+            let activeTab = 'file';
+
+            // ─── Tab switching ────────────────────────────────────────────
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const target = tab.dataset.tab;
+                    activeTab = target;
+                    Object.keys(tabContents).forEach(key => {
+                        tabContents[key].classList.toggle('active', key === target);
+                    });
+                    clearOutput();
+                    setStatus('', '');
+                });
+            });
 
             // ─── Utilities ────────────────────────────────────────────────
             function formatSize(bytes) {
@@ -423,38 +486,34 @@
             function clearOutput() {
                 output.style.display = 'none';
                 outputBody.textContent = '';
+                outputBody.innerHTML = '';
                 setStatus('', '');
             }
 
             function displayOutput(text) {
-                outputBody.textContent = text;
+                // Ensure we have a string
+                let outputText = text;
+                if (typeof text === 'object') {
+                    outputText = JSON.stringify(text, null, 2);
+                }
+                
                 output.style.display = 'flex';
-                // Optional: attempt to highlight JSON
+                
+                // Try to parse as JSON for syntax highlighting
                 try {
-                    const parsed = JSON.parse(text);
+                    const parsed = JSON.parse(outputText);
                     const formatted = JSON.stringify(parsed, null, 2);
                     outputBody.textContent = formatted;
-                    // Simple syntax highlight with regex (basic)
-                    const highlighted = formatted.replace(
-                        /("(?:[^"\\]|\\.)*")(?=\s*:)/g,
-                        '<span class="json-key">$1</span>'
-                    ).replace(
-                        /: ("(?:[^"\\]|\\.)*")/g,
-                        ': <span class="json-string">$1</span>'
-                    ).replace(
-                        /: (\d+\.?\d*)/g,
-                        ': <span class="json-number">$1</span>'
-                    ).replace(
-                        /: (true|false)/g,
-                        ': <span class="json-boolean">$1</span>'
-                    ).replace(
-                        /: (null)/g,
-                        ': <span class="json-null">$1</span>'
-                    );
+                    const highlighted = formatted
+                        .replace(/("(?:[^"\\]|\\.)*")(?=\s*:)/g, '<span class="json-key">$1</span>')
+                        .replace(/: ("(?:[^"\\]|\\.)*")/g, ': <span class="json-string">$1</span>')
+                        .replace(/: (\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+                        .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
+                        .replace(/: (null)/g, ': <span class="json-null">$1</span>');
                     outputBody.innerHTML = highlighted;
                 } catch {
-                    // Not JSON – display as plain text
-                    outputBody.textContent = text;
+                    // Not JSON - display as plain text
+                    outputBody.textContent = outputText;
                 }
             }
 
@@ -470,14 +529,9 @@
             }
 
             dropZone.addEventListener('click', () => fileInput.click());
-
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('dragover');
-            });
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault();
+                dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
             dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('dragover');
@@ -485,7 +539,6 @@
                     handleFile(e.dataTransfer.files[0]);
                 }
             });
-
             fileInput.addEventListener('change', () => {
                 if (fileInput.files.length) {
                     handleFile(fileInput.files[0]);
@@ -497,27 +550,43 @@
                 selectedFile = null;
                 fileInput.value = '';
                 fileInfo.style.display = 'none';
+                stringInput.value = '';
                 clearOutput();
                 setStatus('', '');
             });
 
             // ─── Decrypt ──────────────────────────────────────────────────
             decryptBtn.addEventListener('click', async () => {
-                if (!selectedFile) {
-                    setStatus('Please select a file first.', 'error');
-                    return;
+                let endpoint = '/decrypt';
+                let body;
+
+                if (activeTab === 'file') {
+                    if (!selectedFile) {
+                        setStatus('Please select a file first.', 'error');
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    body = formData;
+                } else {
+                    const darkString = stringInput.value.trim();
+                    if (!darkString) {
+                        setStatus('Please paste a dark tunnel string.', 'error');
+                        return;
+                    }
+                    endpoint = '/decrypt/darktunnel';
+                    body = JSON.stringify({ string: darkString });
                 }
 
                 showSpinner(true);
                 setStatus('Decrypting...', 'success');
 
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-
                 try {
-                    const response = await fetch('/decrypt', {
+                    const headers = activeTab === 'string' ? { 'Content-Type': 'application/json' } : {};
+                    const response = await fetch(endpoint, {
                         method: 'POST',
-                        body: formData
+                        headers: headers,
+                        body: body
                     });
 
                     const result = await response.json();
@@ -530,8 +599,24 @@
                         throw new Error(result.error || 'Decryption failed');
                     }
 
-                    setStatus(`✅ Decrypted ${result.filename} (${result.extension})`, 'success');
-                    displayOutput(result.decrypted);
+                    // Get the decrypted content - handle different response formats
+                    let outputText = null;
+                    if (result.decrypted) {
+                        outputText = result.decrypted;
+                    } else if (result.formatted) {
+                        outputText = result.formatted;
+                    } else {
+                        // If we have a success but no decrypted field, stringify the whole result
+                        outputText = JSON.stringify(result, null, 2);
+                    }
+
+                    // If outputText is an object, stringify it
+                    if (typeof outputText === 'object') {
+                        outputText = JSON.stringify(outputText, null, 2);
+                    }
+
+                    setStatus(`✅ Decrypted successfully`, 'success');
+                    displayOutput(outputText);
 
                 } catch (err) {
                     setStatus(`❌ ${err.message}`, 'error');
@@ -542,14 +627,13 @@
 
             // ─── Copy ─────────────────────────────────────────────────────
             copyBtn.addEventListener('click', () => {
-                const text = outputBody.textContent;
+                const text = outputBody.textContent || outputBody.innerText;
                 if (!text) return;
                 navigator.clipboard.writeText(text).then(() => {
                     const original = copyBtn.textContent;
                     copyBtn.textContent = '✔';
                     setTimeout(() => copyBtn.textContent = original, 1500);
                 }).catch(() => {
-                    // fallback
                     const range = document.createRange();
                     range.selectNode(outputBody);
                     window.getSelection().removeAllRanges();
@@ -562,9 +646,6 @@
                 });
             });
 
-            // ─── Init ─────────────────────────────────────────────────────
-            // Try to load a file from URL param ?file=... (if needed)
-            // For now, just start clean.
             clearOutput();
         })();
     </script>

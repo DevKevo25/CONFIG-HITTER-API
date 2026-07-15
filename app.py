@@ -1,3 +1,5 @@
+# app.py - Fixed using dark_cloud_decryptor for string
+
 import os
 import json
 import base64
@@ -5,96 +7,137 @@ import logging
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from decryptors import DECRYPTORS
+from decryptors.dark_cloud_decryptor import DTDecryptor as DarkCloudDecryptor
 
-# ─── Configuration ──────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests
+CORS(app)
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 PORT = int(os.getenv('PORT', 5000))
 
 logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ─── Helper: Detect extension from filename ────────────────────
 def detect_extension(filename: str) -> str:
     ext = os.path.splitext(filename)[1].lower()
     if ext in DECRYPTORS:
         return ext
-    # Fallback: check against known extensions
     for known in DECRYPTORS:
         if filename.lower().endswith(known):
             return known
     return None
 
-# ─── Helper: Attempt magic‑byte detection ─────────────────────
 def detect_by_magic(data: bytes) -> str:
-    """Optional: detect file type by header if extension missing."""
-    # NPVT files often start with b'NPVTSUB1' or b'NPVT1'
     if data.startswith(b'NPVTSUB1') or data.startswith(b'NPVT1'):
         return '.npvt'
-    # EHI files are binary, but we can't easily detect; rely on extension
-    # SSC are plain text starting with "ssc://" or JSON-like
     try:
         text = data[:100].decode('utf-8', errors='ignore')
         if text.strip().startswith('ssc://') or text.strip().startswith('{'):
             return '.ssc'
     except:
         pass
-    # Dark Tunnel often starts with base64 JSON after "://"
-    # HTTP Custom is tricky – rely on extension.
     return None
 
 @app.route('/')
 def index():
-  return send_file('index.html')
+    return send_file('index.html')
 
-# ─── Main Decrypt Endpoint ──────────────────────────────────────
+# ─── Dark Tunnel String Decrypt Endpoint using Dark Cloud Decryptor ──────
+@app.route('/decrypt/darktunnel', methods=['POST'])
+def decrypt_dark_tunnel_string():
+    try:
+        if request.is_json:
+            data = request.get_json()
+            if not data or 'string' not in data:
+                return jsonify({'error': 'Missing "string" field'}), 400
+            raw_string = data['string'].strip()
+        else:
+            raw_string = request.data.decode('utf-8', errors='ignore').strip()
+            if not raw_string:
+                return jsonify({'error': 'Empty request body'}), 400
+
+        logger.info(f'Decrypting dark tunnel string with dark_cloud_decryptor (length: {len(raw_string)})')
+
+        # Remove prefix
+        if raw_string.startswith('darktunnel://'):
+            raw_string = raw_string[12:].strip()
+        elif '://' in raw_string:
+            raw_string = raw_string.split('://', 1)[1]
+
+        if not raw_string:
+            return jsonify({'error': 'Invalid dark tunnel format'}), 400
+
+        # Clean and fix
+        raw_string = ''.join(raw_string.split())
+        if raw_string.startswith('/'):
+            raw_string = raw_string[1:]
+
+        # Use dark_cloud_decryptor
+        file_bytes = raw_string.encode('utf-8')
+        result = DarkCloudDecryptor.execute(file_bytes)
+
+        if result is None:
+            return jsonify({'error': 'Decryption failed - invalid dark tunnel string'}), 400
+
+        try:
+            json_start = result.find('{')
+            if json_start != -1:
+                json_end = result.rfind('}') + 1
+                if json_end > json_start:
+                    parsed = json.loads(result[json_start:json_end])
+                    return jsonify({
+                        'status': 'success',
+                        'type': 'dark_tunnel',
+                        'decrypted': parsed,
+                        'formatted': result
+                    })
+        except:
+            pass
+
+        return jsonify({
+            'status': 'success',
+            'type': 'dark_tunnel',
+            'decrypted': result,
+            'formatted': result
+        })
+
+    except Exception as e:
+        logger.exception('Error in /decrypt/darktunnel')
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
 @app.route('/decrypt', methods=['POST'])
 def decrypt_file():
-    """
-    Accept a file (multipart/form-data) and return decrypted JSON.
-    Form field name: 'file' (required)
-    Optional: 'filename' (if not provided, we use the uploaded file's name)
-    """
     try:
-        # 1. Get file from request
         if 'file' not in request.files:
-            return jsonify({'error': 'No file part in request'}), 400
+            return jsonify({'error': 'No file'}), 400
 
         uploaded = request.files['file']
         if uploaded.filename == '':
             return jsonify({'error': 'Empty filename'}), 400
 
-        # 2. Read file data
         data = uploaded.read()
         if len(data) == 0:
-            return jsonify({'error': 'File is empty'}), 400
+            return jsonify({'error': 'Empty file'}), 400
         if len(data) > MAX_FILE_SIZE:
-            return jsonify({'error': f'File exceeds {MAX_FILE_SIZE//1024//1024}MB limit'}), 413
+            return jsonify({'error': f'File exceeds {MAX_FILE_SIZE//1024//1024}MB'}), 413
 
-        # 3. Determine extension
         filename = uploaded.filename
         ext = detect_extension(filename)
         if not ext:
-            # Try magic detection
             ext = detect_by_magic(data)
         if not ext:
-            return jsonify({'error': f'Unsupported file type: {filename}'}), 400
+            return jsonify({'error': f'Unsupported: {filename}'}), 400
 
-        # 4. Get decryptor
         decryptor = DECRYPTORS.get(ext)
         if not decryptor:
-            return jsonify({'error': f'No decryptor for extension {ext}'}), 400
+            return jsonify({'error': f'No decryptor for {ext}'}), 400
 
-        # 5. Decrypt
         logger.info(f'Decrypting {filename} as {ext}')
         result = decryptor(data)
         if result is None:
-            return jsonify({'error': 'Decryption failed – invalid or corrupted file'}), 400
+            return jsonify({'error': 'Decryption failed'}), 400
 
-        # 6. Return JSON response
         return jsonify({
             'status': 'success',
             'extension': ext,
@@ -103,40 +146,34 @@ def decrypt_file():
         })
 
     except Exception as e:
-        logger.exception('Unexpected error during decryption')
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        logger.exception('Error in /decrypt')
+        return jsonify({'error': str(e)}), 500
 
-# ─── Alternative: Decrypt from Base64 JSON ─────────────────────
 @app.route('/decrypt/base64', methods=['POST'])
 def decrypt_base64():
-    """
-    Accept JSON: {"file": "<base64 string>", "filename": "optional"}
-    Returns same structure as /decrypt.
-    """
     try:
         data = request.get_json()
         if not data or 'file' not in data:
-            return jsonify({'error': 'Missing "file" field in JSON'}), 400
+            return jsonify({'error': 'Missing "file" field'}), 400
 
         file_b64 = data['file']
-        # Remove data URL prefix if present
         if ',' in file_b64:
             file_b64 = file_b64.split(',')[1]
         file_bytes = base64.b64decode(file_b64)
 
         filename = data.get('filename', 'unknown.bin')
         if len(file_bytes) > MAX_FILE_SIZE:
-            return jsonify({'error': f'File exceeds {MAX_FILE_SIZE//1024//1024}MB limit'}), 413
+            return jsonify({'error': f'File exceeds {MAX_FILE_SIZE//1024//1024}MB'}), 413
 
         ext = detect_extension(filename)
         if not ext:
             ext = detect_by_magic(file_bytes)
         if not ext:
-            return jsonify({'error': f'Unsupported file type: {filename}'}), 400
+            return jsonify({'error': f'Unsupported: {filename}'}), 400
 
         decryptor = DECRYPTORS.get(ext)
         if not decryptor:
-            return jsonify({'error': f'No decryptor for extension {ext}'}), 400
+            return jsonify({'error': f'No decryptor for {ext}'}), 400
 
         result = decryptor(file_bytes)
         if result is None:
@@ -155,15 +192,27 @@ def decrypt_base64():
         logger.exception('Error in /decrypt/base64')
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
-# ─── Health Check ────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
         'status': 'healthy',
         'supported_extensions': list(DECRYPTORS.keys()),
-        'version': '2.0.0'
+        'version': '2.1.0',
+        'endpoints': {
+            '/decrypt': 'POST - Upload file',
+            '/decrypt/base64': 'POST - Base64 file',
+            '/decrypt/darktunnel': 'POST - Dark tunnel string (using dark_cloud_decryptor)',
+            '/health': 'GET - Health check'
+        }
     })
 
-# ─── Run ──────────────────────────────────────────────────────────
 if __name__ == '__main__':
+    print("=" * 60)
+    print("🔥 DARK TUNNEL DECRYPTOR API")
+    print("=" * 60)
+    print(f"📍 Port: {PORT}")
+    print(f"🐞 Debug: {DEBUG}")
+    print("=" * 60)
+    print("🔥 Using dark_cloud_decryptor for string decryption")
+    print("=" * 60)
     app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
