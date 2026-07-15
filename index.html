@@ -1143,11 +1143,12 @@ function showResponse(prefix, status, body, ms) {
       : 'decrypted' + meta.ext);
 
     _store[prefix] = {
-      decrypted: rawDecrypted,          // raw value (obj or str) for /rebuild
-      extension: ext,                   // e.g. ".hc", "dark_tunnel"
+      rebuild_token: parsed.rebuild_token || null,   // server-side token for GET /rebuild/<token>
+      extension: ext,
       filename: fname,
       mime: meta.mime,
       label: meta.label,
+      decrypted: rawDecrypted,          // kept for "Copy Raw"
     };
 
     if (dl) {
@@ -1182,20 +1183,18 @@ async function triggerDownload(prefix) {
   const d = _store[prefix];
   if (!d) return;
 
+  if (!d.rebuild_token) {
+    alert('No rebuild token — please re-decrypt the file and try again.');
+    return;
+  }
+
   const btn = document.querySelector(`#${prefix}-dl .btn-download`);
   const origLabel = btn ? btn.innerHTML : '';
   if (btn) btn.innerHTML = '<span style="opacity:.6">Building…</span>';
 
   try {
-    const res = await fetch('/rebuild', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        decrypted:  d.decrypted,
-        extension:  d.extension,
-        filename:   d.filename,
-      })
-    });
+    /* Stream the rebuilt binary from the server via the token URL */
+    const res = await fetch(`/rebuild/${d.rebuild_token}`);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -1204,7 +1203,6 @@ async function triggerDownload(prefix) {
     }
 
     const blob = await res.blob();
-    // Read filename from Content-Disposition if present
     const cd = res.headers.get('Content-Disposition') || '';
     const match = cd.match(/filename[^;=\n]*=["']?([^"'\n;]+)/);
     const fname = match ? match[1] : d.filename;

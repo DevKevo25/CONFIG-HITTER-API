@@ -3,12 +3,14 @@
 import os
 import io
 import json
+import uuid
+import time
 import base64
 import logging
-import zipfile
 import requests
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from decryptors.builders import BUILDERS, BUILD_META
 from decryptors import DECRYPTORS
 from decryptors.dark_cloud_decryptor import DTDecryptor as DarkCloudDecryptor
 
@@ -16,6 +18,27 @@ app = Flask(__name__)
 CORS(app)
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# ─── Server-side token store for binary rebuild ───────────────────────────────
+_REBUILD_STORE: dict = {}
+_TOKEN_TTL = 3600  # seconds
+
+def _clean_tokens():
+    now = time.time()
+    expired = [k for k, v in _REBUILD_STORE.items() if now - v['ts'] > _TOKEN_TTL]
+    for k in expired:
+        del _REBUILD_STORE[k]
+
+def _store_for_rebuild(raw_bytes: bytes, ext: str, filename: str) -> str:
+    _clean_tokens()
+    token = str(uuid.uuid4())
+    _REBUILD_STORE[token] = {
+        'raw': raw_bytes,
+        'ext': ext,
+        'filename': filename,
+        'ts': time.time(),
+    }
+    return token
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 PORT = int(os.getenv('PORT', 5000))
 
@@ -83,6 +106,8 @@ def decrypt_dark_tunnel_string():
         if result is None:
             return jsonify({'error': 'Decryption failed - invalid dark tunnel string'}), 400
 
+        rebuild_token = _store_for_rebuild(file_bytes, '.dark', 'config.dark')
+
         try:
             json_start = result.find('{')
             if json_start != -1:
@@ -93,7 +118,8 @@ def decrypt_dark_tunnel_string():
                         'status': 'success',
                         'type': 'dark_tunnel',
                         'decrypted': parsed,
-                        'formatted': result
+                        'formatted': result,
+                        'rebuild_token': rebuild_token,
                     })
         except:
             pass
@@ -102,7 +128,8 @@ def decrypt_dark_tunnel_string():
             'status': 'success',
             'type': 'dark_tunnel',
             'decrypted': result,
-            'formatted': result
+            'formatted': result,
+            'rebuild_token': rebuild_token,
         })
 
     except Exception as e:
@@ -141,11 +168,13 @@ def decrypt_file():
         if result is None:
             return jsonify({'error': 'Decryption failed'}), 400
 
+        rebuild_token = _store_for_rebuild(data, ext, filename)
         return jsonify({
             'status': 'success',
             'extension': ext,
             'filename': filename,
-            'decrypted': result
+            'decrypted': result,
+            'rebuild_token': rebuild_token,
         })
 
     except Exception as e:
@@ -182,11 +211,13 @@ def decrypt_base64():
         if result is None:
             return jsonify({'error': 'Decryption failed'}), 400
 
+        rebuild_token = _store_for_rebuild(file_bytes, ext, filename)
         return jsonify({
             'status': 'success',
             'extension': ext,
             'filename': filename,
-            'decrypted': result
+            'decrypted': result,
+            'rebuild_token': rebuild_token,
         })
 
     except base64.binascii.Error:
@@ -248,6 +279,8 @@ def decrypt_ehi_cloud():
         if result is None or result.startswith('❌'):
             return jsonify({'error': result or 'Decryption failed'}), 400
         
+        rebuild_token = _store_for_rebuild(file_bytes, '.ehi', 'config.ehi')
+
         # Parse the result to extract JSON
         try:
             json_start = result.find('{')
@@ -260,7 +293,8 @@ def decrypt_ehi_cloud():
                         'type': 'ehi_cloud',
                         'source': url,
                         'decrypted': parsed,
-                        'formatted': result
+                        'formatted': result,
+                        'rebuild_token': rebuild_token,
                     })
         except:
             pass
@@ -270,7 +304,8 @@ def decrypt_ehi_cloud():
             'type': 'ehi_cloud',
             'source': url,
             'decrypted': result,
-            'formatted': result
+            'formatted': result,
+            'rebuild_token': rebuild_token,
         })
         
     except Exception as e:
@@ -278,117 +313,44 @@ def decrypt_ehi_cloud():
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
 
-def _extract_json_from_decrypted(decrypted_str):
-    """Pull the JSON object/array out of a banner-wrapped decrypted string."""
-    if isinstance(decrypted_str, (dict, list)):
-        return decrypted_str  # already parsed
-    s = str(decrypted_str)
-    # Find the first { or [ and the matching last } or ]
-    start = -1
-    for ch, end_ch in [('{', '}'), ('[', ']')]:
-        idx = s.find(ch)
-        if idx != -1 and (start == -1 or idx < start):
-            start = idx
-            end = s.rfind(end_ch)
-    if start == -1:
-        return None
-    try:
-        return json.loads(s[start:end + 1])
-    except Exception:
-        return None
-
-
-def _build_hc_file(config_json):
-    """HTTP Custom — importable JSON. Strip the Protections wrapper, keep Config fields."""
-    if isinstance(config_json, dict):
-        # If it came from our decryptor it has {"Protections": ..., "Config": {...}}
-        inner = config_json.get('Config', config_json)
-        return json.dumps(inner, indent=4, ensure_ascii=False).encode('utf-8')
-    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
-
-
-def _build_ehi_file(config_json):
-    """HTTP Injector — .ehi is a ZIP archive containing the config JSON."""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('config.json', json.dumps(config_json, indent=4, ensure_ascii=False))
-    buf.seek(0)
-    return buf.read()
-
-
-def _build_npvt_file(config_json):
-    """NPVT — plain JSON config."""
-    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
-
-
-def _build_ssc_file(config_json):
-    """SSH Custom — plain JSON config."""
-    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
-
-
-def _build_dark_file(config_json):
-    """Dark Tunnel / Dark Cloud — plain JSON config."""
-    return json.dumps(config_json, indent=4, ensure_ascii=False).encode('utf-8')
-
-
-EXT_BUILDERS = {
-    '.hc':         (_build_hc_file,   'application/octet-stream', '.hc'),
-    '.ehi':        (_build_ehi_file,   'application/zip',          '.ehi'),
-    '.ehi_cloud':  (_build_ehi_file,   'application/zip',          '.ehi'),
-    'ehi_cloud':   (_build_ehi_file,   'application/zip',          '.ehi'),
-    '.npvt':       (_build_npvt_file,  'application/octet-stream', '.npvt'),
-    '.ssc':        (_build_ssc_file,   'application/octet-stream', '.ssc'),
-    '.dark':       (_build_dark_file,  'application/octet-stream', '.dark'),
-    '.darktunnel': (_build_dark_file,  'application/octet-stream', '.dark'),
-    '.darkcloud':  (_build_dark_file,  'application/octet-stream', '.dark'),
-    'dark_tunnel': (_build_dark_file,  'application/octet-stream', '.dark'),
-}
-
-
-@app.route('/rebuild', methods=['POST'])
-def rebuild_file():
+@app.route('/rebuild/<token>', methods=['GET'])
+def rebuild_file(token):
     """
-    Reconstruct a proper importable config file from decrypted data.
-    Body JSON: { "decrypted": <str|obj>, "extension": ".hc", "filename": "optional" }
-    Returns the binary file as a download.
+    Retrieve original raw file bytes from server store, re-encrypt with lock
+    flags stripped, and stream back a proper importable binary file.
     """
     try:
-        data = request.get_json()
-        if not data or 'decrypted' not in data:
-            return jsonify({'error': 'Missing "decrypted" field'}), 400
+        entry = _REBUILD_STORE.get(token)
+        if not entry:
+            return jsonify({'error': 'Token expired or not found. Re-decrypt the file to get a new token.'}), 404
 
-        decrypted = data['decrypted']
-        ext = data.get('extension', '').lower().strip()
-        filename_base = data.get('filename', 'config')
-        # Strip any existing extension from filename_base
-        if '.' in filename_base:
-            filename_base = filename_base.rsplit('.', 1)[0]
+        raw_bytes = entry['raw']
+        ext       = entry['ext']
+        filename  = entry['filename']
 
-        builder_info = EXT_BUILDERS.get(ext)
-        if not builder_info:
-            return jsonify({'error': f'No file builder for extension: {ext}'}), 400
+        builder = BUILDERS.get(ext)
+        if not builder:
+            return jsonify({'error': f'No binary builder for extension: {ext}'}), 400
 
-        builder_fn, mime_type, out_ext = builder_info
+        built = builder(raw_bytes)
+        if built is None:
+            return jsonify({'error': f'Failed to rebuild {ext} — format may not be fully supported yet'}), 500
 
-        # Extract JSON from the decrypted string/object
-        config_json = _extract_json_from_decrypted(decrypted)
-        if config_json is None:
-            return jsonify({'error': 'Could not extract JSON config from decrypted data'}), 400
+        mime, out_ext = BUILD_META.get(ext, ('application/octet-stream', ext))
+        base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+        out_filename = base_name + '_unlocked' + out_ext
 
-        file_bytes = builder_fn(config_json)
-        out_filename = filename_base + out_ext
-
-        logger.info(f'Rebuilt {out_filename} ({len(file_bytes)} bytes) for ext={ext}')
+        logger.info(f'Rebuilt {out_filename} ({len(built)} bytes) for ext={ext}')
 
         return send_file(
-            io.BytesIO(file_bytes),
-            mimetype=mime_type,
+            io.BytesIO(built),
+            mimetype=mime,
             as_attachment=True,
-            download_name=out_filename
+            download_name=out_filename,
         )
 
     except Exception as e:
-        logger.exception('Error in /rebuild')
+        logger.exception('Error in /rebuild/<token>')
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
 
