@@ -1,19 +1,19 @@
 // kotlinc rt-encode.kt -include-runtime -d rt-encode.jar
 // java -jar rt-encode.jar test1.json test1-rebuilt.RT
 // ============================================================================
-// REESE TUNNEL .RT file encoder — RSE5 format
+// REESE TUNNEL .RT file encoder — RSE5 format (0xC4 unlocked, 0xC6 locked)
 //
 // Modes (interactive menu):
-//   1. export (unlocked, sigBound only)            flags 0x04
-//   2. export with password                        flags 0x06
-//   3. export with hwid                            flags 0x05
-//   4. export with hwid + password                 flags 0x07
+//   1. export (unlocked)                    version 0xC4, flags 0x04, pbkdf2(32k)
+//   2. export with password                 version 0xC6, flags 0x02, customKdf(600k)
+//   3. export with hwid                     version 0xC6, flags 0x01, customKdf(600k)
+//   4. export with hwid + password          version 0xC6, flags 0x03, customKdf(600k)
 //
 // KDF input template:
-//   "REESE-CUSTOM/RSE5|" + HWID_UPPER + "|" + PASSWORD + ("|SIG:" + signer if sigBound)
+//   "REESE-CUSTOM/RSE5|" + HWID_UPPER + "|" + PASSWORD + ("|SIG:" + signer if 0xC4)
 //
-// Same crypto as the decoder. Tree-walk unlock (name-based) runs before
-// encryption so notes/banners containing "locked":true aren't corrupted.
+// Tree-walk unlock runs before encryption so notes/banners containing
+// "locked":true aren't corrupted.
 // ============================================================================
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -21,6 +21,7 @@ import java.security.SecureRandom
 import java.util.zip.Deflater
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
@@ -28,17 +29,38 @@ import javax.crypto.spec.SecretKeySpec
 val MAGIC = byteArrayOf(0xA7.toByte(), 0x19, 0xD2.toByte(), 0x4C)
 const val KDF_PREFIX = "REESE-CUSTOM/RSE5|"
 const val SIG_SUFFIX = "|SIG:"
-const val ITER = 32768
+const val ITER_C4 = 32768
+const val ITER_C6 = 600000
 const val KEY_LEN = 32
 const val DEFAULT_SIGNER = "D834BF8D60BFEA09A80A51CCD1A77DE3EF966E7833EBB2D0B8DC1F750E38BBA7"
 val RNG = SecureRandom()
 
 // ---- crypto helpers --------------------------------------------------------
+
 fun pbkdf2(password: ByteArray, salt: ByteArray, iter: Int, keyLen: Int): ByteArray {
     val spec = PBEKeySpec(String(password, StandardCharsets.UTF_8).toCharArray(),
         salt, iter, keyLen * 8)
     return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         .generateSecret(spec).encoded
+}
+
+// Native rse5Open KDF (0xC6): iterated HMAC-SHA256 chain with XOR accumulator.
+// First: HMAC(key=input, data=salt || 00 00 00 01)  [BE32 counter 1]
+// Then:  599,999 iterations of h = HMAC(key=input, data=h), acc ^= h
+fun customKdf(input: ByteArray, salt: ByteArray, iterations: Int): ByteArray {
+    val mac = Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(input, "HmacSHA256"))
+    mac.reset()
+    mac.update(salt)
+    mac.update(byteArrayOf(0x00, 0x00, 0x00, 0x01))  // BE32 counter = 1
+    var h = mac.doFinal()
+    val acc = h.copyOf()
+    for (i in 1 until iterations) {
+        mac.reset()
+        h = mac.doFinal(h)
+        for (j in 0 until 32) acc[j] = (acc[j].toInt() xor h[j].toInt()).toByte()
+    }
+    return acc
 }
 
 fun aesGcmEncrypt(key: ByteArray, iv: ByteArray, aad: ByteArray, plain: ByteArray): ByteArray {
@@ -85,7 +107,7 @@ fun buildPaddedPayload(payload: ByteArray): ByteArray {
     return out.toByteArray()
 }
 
-// ---- minimal JSON tree -----------------------------------------------------
+// ---- minimal JSON tree (unchanged) ----------------------------------------
 sealed class JVal {
     object JNull : JVal()
     data class JBool(val v: Boolean) : JVal()
@@ -97,7 +119,6 @@ sealed class JVal {
 
 class JParser(private val s: String) {
     private var i = 0
-
     fun parse(): JVal {
         skipWs()
         val v = parseVal()
@@ -105,9 +126,7 @@ class JParser(private val s: String) {
         require(i == s.length) { "trailing data at $i" }
         return v
     }
-
     private fun skipWs() { while (i < s.length && s[i].isWhitespace()) i++ }
-
     private fun parseVal(): JVal {
         skipWs()
         require(i < s.length) { "unexpected EOF" }
@@ -121,14 +140,12 @@ class JParser(private val s: String) {
             else -> parseNum()
         }
     }
-
     private fun expect(word: String) {
         require(s.regionMatches(i, word, 0, word.length)) { "expected $word at $i" }
         i += word.length
     }
-
     private fun parseObj(): JVal.JObj {
-        i++ // {
+        i++
         val m = LinkedHashMap<String, JVal>()
         skipWs()
         if (i < s.length && s[i] == '}') { i++; return JVal.JObj(m) }
@@ -147,9 +164,8 @@ class JParser(private val s: String) {
         }
         return JVal.JObj(m)
     }
-
     private fun parseArr(): JVal.JArr {
-        i++ // [
+        i++
         val m = ArrayList<JVal>()
         skipWs()
         if (i < s.length && s[i] == ']') { i++; return JVal.JArr(m) }
@@ -164,7 +180,6 @@ class JParser(private val s: String) {
         }
         return JVal.JArr(m)
     }
-
     private fun parseStr(): String {
         require(s[i] == '"') { "expected \" at $i" }; i++
         val sb = StringBuilder()
@@ -193,7 +208,6 @@ class JParser(private val s: String) {
             }
         }
     }
-
     private fun parseNum(): JVal.JNum {
         val start = i
         if (s[i] == '-') i++
@@ -243,7 +257,7 @@ fun JVal.serialize(sb: StringBuilder = StringBuilder()): StringBuilder {
     return sb
 }
 
-// ---- unlock walk -----------------------------------------------------------
+// ---- unlock walk (unchanged) ----------------------------------------------
 val FORCE_FALSE_KEYS = setOf(
     "locked", "lockAll", "lockPayloadUnlockServer", "unlockUserPass",
     "lockRemoteProxy", "blockRoot", "lockConfig", "importLocked",
@@ -280,6 +294,7 @@ data class LockMode(
     val hwidLocked: Boolean,
     val pwLocked: Boolean,
     val sigBound: Boolean,
+    val isC6: Boolean,
 ) {
     val flags: Int
         get() = (if (hwidLocked) 0x01 else 0) or
@@ -287,7 +302,6 @@ data class LockMode(
                 (if (sigBound)   0x04 else 0)
 }
 
-// Prompt helpers
 fun prompt(label: String): String {
     print(label)
     System.out.flush()
@@ -306,19 +320,19 @@ fun promptPassword(label: String): String {
 fun showMenu(): LockMode {
     println()
     println("================ EXPORT MODE ================")
-    println(" 1. Export (unlocked)")
-    println(" 2. Export with password")
-    println(" 3. Export with HWID")
-    println(" 4. Export with HWID + password")
+    println(" 1. Export (unlocked)                 [0xC4, pbkdf2 32k]")
+    println(" 2. Export with password              [0xC6, customKdf 600k]")
+    println(" 3. Export with HWID                  [0xC6, customKdf 600k]")
+    println(" 4. Export with HWID + password       [0xC6, customKdf 600k]")
     println(" 0. Cancel")
     println("=============================================")
     while (true) {
         val choice = prompt("Choose [0-4]: ")
         when (choice) {
-            "1" -> return LockMode("unlocked",      hwidLocked = false, pwLocked = false, sigBound = true)
-            "2" -> return LockMode("password",      hwidLocked = false, pwLocked = true,  sigBound = false)
-            "3" -> return LockMode("hwid",          hwidLocked = true,  pwLocked = false, sigBound = false)
-            "4" -> return LockMode("hwid+password", hwidLocked = true,  pwLocked = true,  sigBound = false)
+            "1" -> return LockMode("unlocked",      hwidLocked = false, pwLocked = false, sigBound = true,  isC6 = false)
+            "2" -> return LockMode("password",      hwidLocked = false, pwLocked = true,  sigBound = false, isC6 = true)
+            "3" -> return LockMode("hwid",          hwidLocked = true,  pwLocked = false, sigBound = false, isC6 = true)
+            "4" -> return LockMode("hwid+password", hwidLocked = true,  pwLocked = true,  sigBound = false, isC6 = true)
             "0" -> { println("[*] cancelled"); kotlin.system.exitProcess(0) }
             else -> println("  invalid choice, try again")
         }
@@ -337,60 +351,59 @@ fun encodeRt(
     signer: String,
     forceUnlock: Boolean,
 ) {
-    // 1. Parse + optionally unlock tree
     val parsed = JParser(json).parse()
     require(parsed is JVal.JObj) { "top-level JSON must be an object" }
     val finalTree = if (forceUnlock) unlockTree(parsed) else parsed
     val finalJson = finalTree.serialize().toString()
     if (forceUnlock) println("[*] tree unlocked (name-based walk)")
 
-    // 2. Deflate
     val jsonBytes = finalJson.toByteArray(StandardCharsets.UTF_8)
     val deflated = deflate(jsonBytes)
     println("[*] json      : ${jsonBytes.size} bytes")
     println("[*] deflated  : ${deflated.size} bytes")
 
-    // 3. Pad
     val padded = buildPaddedPayload(deflated)
     println("[*] padded    : ${padded.size} bytes")
 
-    // 4. Salt + IV
     val salt = randBytes(16)
     val iv   = randBytes(12)
     println("[*] salt      : ${salt.toHex()}")
     println("[*] iv        : ${iv.toHex()}")
 
-    // 5. KDF input (same template as decoder)
+    // KDF input + key
     val hwidUpper = hwid.trim().uppercase()
     val kdfBase   = KDF_PREFIX + hwidUpper + "|" + password.trim()
     val kdfInput  = if (mode.sigBound) kdfBase + SIG_SUFFIX + signer else kdfBase
-    val key = pbkdf2(kdfInput.toByteArray(StandardCharsets.UTF_8), salt, ITER, KEY_LEN)
+    val kdfBytes  = kdfInput.toByteArray(StandardCharsets.UTF_8)
+
+    val key = if (mode.isC6)
+        customKdf(kdfBytes, salt, ITER_C6)
+    else
+        pbkdf2(kdfBytes, salt, ITER_C4, KEY_LEN)
+
     println("[*] kdfInput  : \"${kdfInput}\"")
+    println("[*] kdf       : ${if (mode.isC6) "customKdf(600k)" else "pbkdf2(32k)"}")
     println("[*] key       : ${key.toHex()}")
 
-    // 6. Header / AAD
+    // Header
+    val versionByte = if (mode.isC6) 0xC6 else 0xC4
     val header = java.io.ByteArrayOutputStream()
     header.write(MAGIC)
-    
-    // Version byte: 0xC4 for unlocked (sigBound only), 0xC5 for locked variants
-    val versionByte = if (mode.sigBound && !mode.hwidLocked && !mode.pwLocked) 0xC4 else 0xC5
     header.write(versionByte)
-    
-    header.write(mode.flags)    // bit0 hwid, bit1 password, bit2 sigBound
+    header.write(mode.flags)
     header.write(salt)
     header.write(iv)
-    
     val headerBytes = header.toByteArray()
     require(headerBytes.size == 34) { "header must be 34 bytes, got ${headerBytes.size}" }
     println("[*] version   : 0x%02x".format(versionByte))
     println("[*] flags     : 0x%02x (hwid=%s pw=%s sig=%s)".format(
         mode.flags, mode.hwidLocked, mode.pwLocked, mode.sigBound))
 
-    // 7. Encrypt
+    // Encrypt
     val ctAndTag = aesGcmEncrypt(key, iv, headerBytes, padded)
     println("[*] ct+tag    : ${ctAndTag.size} bytes")
 
-    // 8. Write
+    // Write
     File(outPath).writeBytes(headerBytes + ctAndTag)
     println("[*] wrote     : $outPath (${headerBytes.size + ctAndTag.size} bytes)")
 }
@@ -426,7 +439,6 @@ fun main(args: Array<String>) {
                 if (hwid.isBlank()) println("  HWID cannot be empty for this mode")
             }
         }
-
         if (mode.pwLocked) {
             println()
             while (password.isBlank()) {
