@@ -1,3 +1,4 @@
+import java.io.Console
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.zip.Inflater
@@ -13,18 +14,16 @@ import javax.crypto.spec.SecretKeySpec
 // File layout:
 //   [0..4]    magic         a7 19 d2 4c
 //   [4]       version       0xc4 (RSE5)
-//   [5]       flags         bit0=lockAll, bit1=hwidLocked, bit2=sigBound
+//   [5]       flags         bit0=hwidLocked, bit1=passwordLocked, bit2=sigBound
 //   [6..22]   salt          16 bytes
 //   [22..34]  iv            12 bytes
 //   [34..end] ciphertext + 16-byte GCM tag
 //
-// KDF (from logcat):
-//   PBKDF2-HMAC-SHA256(
-//     "REESE-CUSTOM/RSE5|||SIG:<signer>",
-//     salt, iter=32768, keyLen=32
-//   )
+// KDF input template (confirmed from working unlocked file):
+//   "REESE-CUSTOM/RSE5|" + HWID_UPPER + "|" + PASSWORD + "|SIG:" + signer
+//   (omit "|SIG:"+signer when sigBound=false)
 //
-// AAD = file[0..34] (magic + version + flags + salt + iv)
+// AAD = file[0..34]
 // Cipher = AES-256-GCM
 //
 // After decrypt:
@@ -35,8 +34,10 @@ import javax.crypto.spec.SecretKeySpec
 // ============================================================================
 
 val MAGIC = byteArrayOf(0xA7.toByte(), 0x19, 0xD2.toByte(), 0x4C)
-const val SIG_PREFIX = "REESE-CUSTOM/RSE5|||SIG:"
+const val KDF_PREFIX = "REESE-CUSTOM/RSE5|"
+const val SIG_SUFFIX = "|SIG:"
 const val ITER = 32768
+const val ITER_C6 = 600000 
 const val KEY_LEN = 32
 
 fun pbkdf2(password: ByteArray, salt: ByteArray, iter: Int, keyLen: Int): ByteArray {
@@ -44,6 +45,25 @@ fun pbkdf2(password: ByteArray, salt: ByteArray, iter: Int, keyLen: Int): ByteAr
                           salt, iter, keyLen * 8)
     return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         .generateSecret(spec).encoded
+}
+
+// Native rse5Open KDF (0xC6): iterated HMAC-SHA256 chain.
+// First: HMAC(key=input, data=salt || 01 00 00 00)  [little-endian counter 1]
+// Then:  599,999 iterations of HMAC(key=input, data=previous_state)
+fun customKdf(input: ByteArray, salt: ByteArray, iterations: Int): ByteArray {
+    val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(input, "HmacSHA256"))
+    mac.reset()
+    mac.update(salt)
+    mac.update(byteArrayOf(0x00, 0x00, 0x00, 0x01))  // BE32 counter 1
+    var h = mac.doFinal()
+    val acc = h.copyOf()
+    for (i in 1 until iterations) {
+        mac.reset()
+        h = mac.doFinal(h)
+        for (j in 0 until 32) acc[j] = (acc[j].toInt() xor h[j].toInt()).toByte()
+    }
+    return acc
 }
 
 fun aesGcmDecrypt(key: ByteArray, iv: ByteArray, aad: ByteArray, ctAndTag: ByteArray): ByteArray {
@@ -69,7 +89,6 @@ fun inflate(data: ByteArray): ByteArray {
     return out.toByteArray()
 }
 
-// F() — extract the deflated payload from the padded plaintext
 fun applyF(plain: ByteArray): ByteArray {
     require(plain.isNotEmpty()) { "empty plaintext" }
     val n = plain[0].toInt() and 0xFF
@@ -85,6 +104,40 @@ fun applyF(plain: ByteArray): ByteArray {
     return plain.copyOfRange(payloadOff, payloadOff + len)
 }
 
+// ---- credential prompting -------------------------------------------------
+
+fun prompt(label: String): String {
+    print(label)
+    System.out.flush()
+    return readlnOrNull()?.trim() ?: ""
+}
+
+fun promptPassword(label: String): String {
+    val console = System.console()
+    if (console != null) {
+        val chars = console.readPassword(label)
+        return if (chars == null) "" else String(chars)
+    }
+    // fallback when no tty (e.g. piped input)
+    return prompt(label)
+}
+
+// ---- lock-mode description -------------------------------------------------
+
+fun describeFlags(flags: Int): String {
+    val hwid = (flags and 0x01) != 0
+    val pw   = (flags and 0x02) != 0
+    val sig  = (flags and 0x04) != 0
+    val parts = mutableListOf<String>()
+    if (hwid) parts += "HWID-locked"
+    if (pw)   parts += "password-locked"
+    if (sig)  parts += "signature-bound"
+    if (parts.isEmpty()) parts += "unlocked"
+    return parts.joinToString(", ")
+}
+
+// ---- main decode -----------------------------------------------------------
+
 fun decodeRt(path: String): String {
     val bytes = File(path).readBytes()
     require(bytes.size >= 50) { "file too small: ${bytes.size}" }
@@ -92,12 +145,23 @@ fun decodeRt(path: String): String {
 
     val version = bytes[4].toInt() and 0xFF
     val flags   = bytes[5].toInt() and 0xFF
-    require(version == 0xC4) { "expected RSE5 (0xc4), got 0x%02x".format(version) }
+        require(version == 0xC4 || version == 0xC5 || version == 0xC6) {
+        "expected RSE5 (0xc4/0xc5/0xc6), got 0x%02x".format(version)
+    }
+    when (version) {
+        0xC5 -> println("version  : 0x%02x (RSE5.1 / locked variant)".format(version))
+        0xC6 -> println("version  : 0x%02x (RSE5.2 / newer variant)".format(version))
+    }
+
+    val hwidLocked = (flags and 0x01) != 0
+    val pwLocked   = (flags and 0x02) != 0
+    // 0xC6 has no sigBound bit — the native rse5Open rejects flags >= 4
+    val sigBound   = version != 0xC6 && (flags and 0x04) != 0
 
     println("=== $path ===")
     println("size     : ${bytes.size} bytes")
     println("version  : 0x%02x (RSE5)".format(version))
-    println("flags    : 0x%02x  lockAll=${(flags and 0x01) != 0} hwidLocked=${(flags and 0x02) != 0} sigBound=${(flags and 0x04) != 0}")
+    println("flags    : 0x%02x  %s".format(flags, describeFlags(flags)))
 
     val salt = bytes.copyOfRange(6, 22)
     val iv   = bytes.copyOfRange(22, 34)
@@ -110,60 +174,97 @@ fun decodeRt(path: String): String {
     println("iv       : ${iv.toHex()}")
     println("ct+tag   : ${ctAndTag.size} bytes")
 
-    // Signer: read from plaintext after we decrypt — but we need it BEFORE to build the KDF.
-    // For files exported by the original app, the signer is always the original cert hash.
-    // For files exported by your patched build, it's baked in during export.
-    // Solution: try candidate signer hashes until GCM succeeds.
+    // signer candidates (sig-bound files need the original APK cert hash)
     val signerCandidates = listOf(
-        "D834BF8D60BFEA09A80A51CCD1A77DE3EF966E7833EBB2D0B8DC1F750E38BBA7",  // original debug cert
-        "A40DA80A59D170CAA950CF15C18C454D47A39B26989D8B640ECD745BA71BF5DC",  // your re-signed cert (if you exported)
-        "",                                                                     // no signer (unlikely)
+        "D834BF8D60BFEA09A80A51CCD1A77DE3EF966E7833EBB2D0B8DC1F750E38BBA7",
+        "A40DA80A59D170CAA950CF15C18C454D47A39B26989D8B640ECD745BA71BF5DC",
+        "",
     )
+
+    // ---- collect credentials once, retry on GCM failure --------------------
+    var hwid = ""
+    var password = ""
+
+    if (hwidLocked) {
+        println()
+        println("This file is locked to a device (HWID).")
+        println("You need the original device's HWID string, e.g. John-Reese-AENB-K4CR-ZSVX-G5WA")
+        hwid = prompt("Enter HWID: ").uppercase()
+    }
+    if (pwLocked) {
+        println()
+        println("This file is password-protected.")
+        password = promptPassword("Enter password: ")
+    }
 
     var plain: ByteArray? = null
     var usedSigner = ""
 
-    for (signer in signerCandidates) {
-        val kdfInput = SIG_PREFIX + signer
-        val key = pbkdf2(kdfInput.toByteArray(StandardCharsets.UTF_8), salt, ITER, KEY_LEN)
-        val result = try {
-            aesGcmDecrypt(key, iv, aad, ctAndTag)
-        } catch (_: Exception) { null }
-        if (result != null) {
-            plain = result
-            usedSigner = signer
-            break
+    while (true) {
+        val kdfBase = KDF_PREFIX + hwid + "|" + password
+        val candidates: List<Pair<String, String>> =
+            if (sigBound) signerCandidates.map { it to (kdfBase + SIG_SUFFIX + it) }
+            else listOf("" to kdfBase)
+
+        plain = null
+        usedSigner = ""
+        for ((signer, kdfInput) in candidates) {
+            if (sigBound) println("  trying signer=${signer.take(16)}… kdfInput=\"${kdfInput}\"")
+            else          println("  kdfInput=\"${kdfInput}\"")
+            val key = if (version == 0xC6)
+                customKdf(kdfInput.toByteArray(StandardCharsets.UTF_8), salt, ITER_C6)
+            else
+                pbkdf2(kdfInput.toByteArray(StandardCharsets.UTF_8), salt, ITER, KEY_LEN)
+            val result = try { aesGcmDecrypt(key, iv, aad, ctAndTag) } catch (_: Exception) { null }
+            if (result != null) {
+                plain = result
+                usedSigner = signer
+                break
+            }
+        }
+
+        if (plain != null) break
+
+        // GCM failed on every candidate — wrong credentials (or unknown build)
+        println()
+        if (hwidLocked || pwLocked) {
+            println("[!] Decryption failed — wrong HWID/password (or unknown signer).")
+            val again = prompt("Retry with different credentials? (y/n): ").lowercase()
+            if (again != "y" && again != "yes") {
+                error("aborted by user")
+            }
+            if (hwidLocked) {
+                hwid = prompt("Enter HWID: ").uppercase()
+            }
+            if (pwLocked) {
+                password = promptPassword("Enter password: ")
+            }
+        } else {
+            error("decryption failed — file was made by an unknown build (no matching signer)")
         }
     }
-
-    require(plain != null) { "GCM failed for all signer candidates — file was made by an unknown build" }
 
     println("signer   : ${if (usedSigner.isEmpty()) "(none)" else usedSigner}")
     println("plain    : ${plain.size} bytes (decrypted)")
 
-    // F(): extract deflated payload
     val deflated = try { applyF(plain) } catch (e: Exception) {
         throw IllegalStateException("F() failed: ${e.message}")
     }
     println("payload  : ${deflated.size} bytes (deflated)")
 
-    // Inflate → JSON
     val jsonBytes = inflate(deflated)
     val json = String(jsonBytes, StandardCharsets.UTF_8)
     require(json.startsWith("{")) { "payload doesn't start with '{' — got: ${json.take(80)}" }
     println("json     : ${json.length} chars")
 
-    // Save raw JSON
     val basePath = path.removeSuffix(".RT").removeSuffix(".rt")
-    File(basePath + ".json").writeText(prettyJson(json))               // full pretty
-    File(basePath + ".clean.json").writeText(scrubNoisy(json))         // scrubbed pretty
+    File(basePath + ".json").writeText(prettyJson(json))
+    File(basePath + ".clean.json").writeText(scrubNoisy(json))
 
     return json
 }
 
-// Replace long base64/data fields with a short placeholder
 fun scrubNoisy(json: String): String {
-    // Line-based scrub — works on pretty-printed JSON
     val lines = prettyJson(json).lines()
     return lines.joinToString("\n") { line ->
         when {
@@ -180,7 +281,6 @@ fun scrubNoisy(json: String): String {
     }
 }
 
-// Lightweight JSON pretty-printer (no external deps)
 fun prettyJson(input: String, indent: String = "  "): String {
     val sb = StringBuilder()
     var depth = 0
@@ -197,8 +297,7 @@ fun prettyJson(input: String, indent: String = "  "): String {
         when (c) {
             '"' -> { inString = true; sb.append(c) }
             '{', '[' -> {
-                sb.append(c)
-                depth++
+                sb.append(c); depth++
                 sb.append('\n').append(indent.repeat(depth))
             }
             '}', ']' -> {
